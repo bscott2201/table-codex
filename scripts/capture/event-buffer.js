@@ -3,25 +3,17 @@ import { logger } from "../core/logger.js";
 import { getJson, setJson } from "../core/storage.js";
 import { apiClient } from "../api/api-client.js";
 import { getSetting } from "../core/settings.js";
-import { getFoundryWorldContext } from "../core/foundry-context.js";
+import { toVttEvent } from "./event-normalizer.js";
 
 const QUEUE_STORAGE_KEY = `${MODULE_ID}.syncQueue`;
-
-function safeUuid() {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
-  }
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
-  });
-}
+const SEQ_STORAGE_KEY = `${MODULE_ID}.sequenceCounter`;
 
 export class EventBuffer {
   constructor() {
     this._queue = [];
     this._flushTimer = null;
     this._flushing = false;
+    this._sequenceCounter = 0;
   }
 
   start() {
@@ -55,9 +47,10 @@ export class EventBuffer {
       return;
     }
 
+    const campaignId = getSetting("campaignId");
     const sessionId = getSetting("sessionId");
-    if (!sessionId) {
-      logger.log("No sessionId — skipping sync flush.");
+    if (!campaignId || !sessionId) {
+      logger.log("No campaignId/sessionId — skipping sync flush.");
       return;
     }
 
@@ -66,14 +59,20 @@ export class EventBuffer {
     this.persist();
 
     try {
-      const payload = {
-        batchId: safeUuid(),
-        captureId: getSetting("captureId") || null,
-        world: getFoundryWorldContext(),
-        events: batch,
-      };
-      await apiClient.sendEventBatch(sessionId, payload);
-      logger.log(`Flushed ${batch.length} events.`);
+      const vttEvents = [];
+      for (const event of batch) {
+        const vtt = toVttEvent(event, this._sequenceCounter);
+        if (vtt) {
+          vttEvents.push(vtt);
+          this._sequenceCounter++;
+        }
+      }
+      setJson(SEQ_STORAGE_KEY, this._sequenceCounter);
+
+      if (vttEvents.length > 0) {
+        await apiClient.sendEventBatch(campaignId, sessionId, vttEvents);
+        logger.log(`Flushed ${vttEvents.length} VTT events (${batch.length - vttEvents.length} skipped).`);
+      }
     } catch (err) {
       logger.warn("Batch sync failed — requeueing events:", err);
       this._queue.unshift(...batch);
@@ -86,7 +85,8 @@ export class EventBuffer {
   restore() {
     const saved = getJson(QUEUE_STORAGE_KEY, []);
     this._queue = Array.isArray(saved) ? saved : [];
-    logger.log(`Restored ${this._queue.length} queued events from storage.`);
+    this._sequenceCounter = getJson(SEQ_STORAGE_KEY, 0);
+    logger.log(`Restored ${this._queue.length} queued events (sequence at ${this._sequenceCounter}).`);
   }
 
   persist() {
@@ -97,16 +97,15 @@ export class EventBuffer {
     return this._queue.length;
   }
 
-  // Returns all events currently in the sync queue.
-  // Note: this may be empty after a successful API sync. Use session-archive for full export.
   getAllEvents() {
     return [...this._queue];
   }
 
-  // Clears only the sync queue (not the session archive).
   clearAllEvents() {
     this._queue = [];
+    this._sequenceCounter = 0;
     this.persist();
+    setJson(SEQ_STORAGE_KEY, 0);
   }
 
   _startTimer() {

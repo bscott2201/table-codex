@@ -1,5 +1,99 @@
 import { getCurrentSceneRef } from "../core/foundry-context.js";
 
+// Maps internal Foundry event types to the API's VTT event type enum.
+const EVENT_TYPE_MAP = {
+  "chat.message": "chat",
+  "chat.roll": "chat",
+  "roll": "chat",
+  "combat.started": "custom",
+  "combat.ended": "custom",
+  "combat.round.started": "custom",
+  "combat.turn.started": "custom",
+  "actor.hp.changed": "custom",
+  "scene.changed": "scene_change",
+};
+
+const SKIP_EVENT_TYPES = new Set(["session.started", "session.ended"]);
+
+function mapEventType(internalType) {
+  return EVENT_TYPE_MAP[internalType] ?? "custom";
+}
+
+function generateSummary(event) {
+  const p = event.payload ?? {};
+  switch (event.eventType) {
+    case "chat.message": {
+      const who = event.speaker?.alias ?? event.actor?.name ?? "Someone";
+      const text = (p.contentText ?? "").slice(0, 200);
+      return text ? `${who}: ${text}` : `${who} sent a message`;
+    }
+    case "chat.roll": {
+      const who = event.speaker?.alias ?? event.actor?.name ?? "Someone";
+      const formula = event.payload?.rolls?.[0]?.formula ?? "?";
+      const total = event.payload?.rolls?.[0]?.total ?? "?";
+      return `${who} rolled ${formula} = ${total}`;
+    }
+    case "roll": {
+      const formula = p.formula ?? "?";
+      const total = p.total ?? "?";
+      return `Roll: ${formula} = ${total}`;
+    }
+    case "combat.started": {
+      const n = (p.combatants ?? []).length;
+      return `Combat started with ${n} combatant${n !== 1 ? "s" : ""}`;
+    }
+    case "combat.ended":
+      return `Combat ended after round ${p.finalRound ?? "?"}`;
+    case "combat.round.started":
+      return `Round ${p.round ?? "?"} began`;
+    case "combat.turn.started": {
+      const name = p.combatantName ?? event.actor?.name ?? "Unknown";
+      return `${name}'s turn (Round ${p.round ?? "?"})`;
+    }
+    case "actor.hp.changed": {
+      const name = p.actorName ?? event.actor?.name ?? "Unknown";
+      const change = p.hpChange;
+      const current = p.hpCurrent ?? "?";
+      const max = p.hpMax ?? "?";
+      if (change != null) {
+        const sign = change > 0 ? "+" : "";
+        return `${name} HP ${sign}${change} → ${current}/${max}`;
+      }
+      return `${name} HP: ${current}/${max}`;
+    }
+    case "scene.changed":
+      return `Scene: ${p.sceneName ?? "unknown"}`;
+    default:
+      return event.eventType ?? "Unknown event";
+  }
+}
+
+// Converts an internal buffered event into the VTT event shape the API expects.
+// Returns null for event types that should not be sent to the API.
+export function toVttEvent(event, sequenceIndex) {
+  if (SKIP_EVENT_TYPES.has(event.eventType)) return null;
+
+  // Determine if HP change was damage or healing for a more precise eventType.
+  let apiEventType = mapEventType(event.eventType);
+  if (event.eventType === "actor.hp.changed") {
+    const change = event.payload?.hpChange;
+    if (change != null) apiEventType = change < 0 ? "damage" : "healing";
+  }
+
+  return {
+    sequenceIndex,
+    eventType: apiEventType,
+    actor: event.actor?.name ?? null,
+    target: null,
+    eventSummary: generateSummary(event),
+    rawLine: null,
+    eventDataJson: event.payload ?? null,
+    visibility: event.privacyLevel === "whisper" ? "dm_only" : "player_safe",
+    confidence: "high",
+    isImportant: false,
+  };
+}
+
 function nowIso() {
   return new Date().toISOString();
 }

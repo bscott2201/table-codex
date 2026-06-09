@@ -10,9 +10,9 @@ import {
 import { logger } from "../core/logger.js";
 
 export async function openExportDialog() {
-  const captureId = getSetting("captureId");
+  const sessionId = getSetting("sessionId");
   const worldId = getFoundryWorldContext().foundryWorldId;
-  const events = getArchivedEvents({ worldId, captureId });
+  const events = getArchivedEvents({ worldId, sessionId });
 
   if (events.length === 0) {
     ui?.notifications?.warn("[TableCodex] No archived events found for the current capture.");

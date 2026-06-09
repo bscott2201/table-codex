@@ -108,3 +108,35 @@
   background: rgba(255,255,255,0.08);
   color: #ccc;
 }
+
+.tc-campaign-info {
+  text-align: center;
+  font-size: 11px;
+  color: #90caf9;
+  padding: 2px 4px;
+}
+
+/* Campaign picker form (opens from module settings) */
+.tc-campaign-picker {
+  padding: 8px 4px;
+}
+
+.tc-campaign-picker select {
+  width: 100%;
+}
+
+.tc-picker-error,
+.tc-picker-empty {
+  padding: 8px;
+  color: #aaa;
+  font-size: 13px;
+}
+
+.tc-picker-error {
+  color: #ef9a9a;
+}
+
+.tc-picker-current {
+  margin-top: 6px;
+  color: #81c784;
+}

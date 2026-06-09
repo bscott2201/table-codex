@@ -21,7 +21,6 @@ export function buildExportMetadata() {
     campaignId: getSetting("campaignId") ?? "",
     sessionId: getSetting("sessionId") ?? "",
     sessionTitle: getSetting("sessionTitle") || "Untitled Session",
-    captureId: getSetting("captureId") ?? "",
     captureMode: getSetting("captureMode") ?? "standard",
     exportedAt: new Date().toISOString(),
   };
@@ -112,7 +111,7 @@ export function formatEventForMarkdown(event, options = {}) {
 export function buildSessionMarkdownExport({ events = [], metadata = {}, options = {} }) {
   const {
     foundryVersion, systemId, systemTitle, worldId, worldTitle,
-    campaignId, sessionId, sessionTitle, captureId, captureMode, exportedAt,
+    campaignId, sessionId, sessionTitle, captureMode, exportedAt,
   } = metadata;
 
   const frontmatter = [
@@ -129,7 +128,6 @@ export function buildSessionMarkdownExport({ events = [], metadata = {}, options
     `campaign_id: "${campaignId}"`,
     `session_id: "${sessionId}"`,
     `session_title: "${sessionTitle || "Untitled Session"}"`,
-    `capture_id: "${captureId}"`,
     `exported_at: "${exportedAt}"`,
     `event_count: ${events.length}`,
     `privacy_mode: "${captureMode}"`,
@@ -147,7 +145,6 @@ export function buildSessionMarkdownExport({ events = [], metadata = {}, options
     `- **Campaign ID:** ${campaignId || "—"}`,
     `- **Session ID:** ${sessionId || "—"}`,
     `- **Session Title:** ${sessionTitle || "Untitled Session"}`,
-    `- **Capture ID:** ${captureId || "—"}`,
     `- **Capture Mode:** ${captureMode}`,
     `- **Exported At:** ${exportedAt}`,
     `- **Event Count:** ${events.length}`,

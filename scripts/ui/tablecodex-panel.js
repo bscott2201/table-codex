@@ -51,6 +51,7 @@ export class TableCodexPanel extends Application {
       ...status,
       moduleTitle: MODULE_TITLE,
       isGM: game?.user?.isGM ?? false,
+      campaignName: getSetting("campaignName") || "",
     };
   }
 
@@ -71,9 +72,7 @@ export class TableCodexPanel extends Application {
     if (sessionTitle === null) return;
 
     const campaignId = getSetting("campaignId") || "";
-    const sessionId = getSetting("sessionId") || "";
-
-    await captureManager.startCapture({ campaignId, sessionId, sessionTitle });
+    await captureManager.startCapture({ campaignId, sessionTitle });
     this.render(true);
   }
 

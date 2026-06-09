@@ -4,7 +4,12 @@ import { getSetting, setSetting } from "../core/settings.js";
 import { getFoundryWorldContext } from "../core/foundry-context.js";
 import { apiClient } from "../api/api-client.js";
 import { eventBuffer } from "./event-buffer.js";
-import { appendArchivedEvent, getArchivedEvents, clearArchivedEventsForCapture, getArchivedEventCount } from "./session-archive.js";
+import {
+  appendArchivedEvent,
+  getArchivedEvents,
+  clearArchivedEventsForSession,
+  getArchivedEventCount,
+} from "./session-archive.js";
 
 function safeUuid() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -17,7 +22,7 @@ function safeUuid() {
 }
 
 class CaptureManager {
-  async startCapture({ campaignId = "", sessionId = "", sessionTitle = "" } = {}) {
+  async startCapture({ campaignId = "", sessionTitle = "" } = {}) {
     if (!requireGM("Start Capture")) return;
     if (getSetting("isCapturing")) {
       ui?.notifications?.warn("[TableCodex] Capture is already active.");
@@ -28,38 +33,44 @@ class CaptureManager {
     const captureMode = getSetting("captureMode") || "standard";
     const apiKey = getSetting("apiKey");
 
-    let captureId;
+    let sessionId;
 
-    if (!apiKey) {
-      ui?.notifications?.info("[TableCodex] API key missing. Starting local-only capture for Markdown export.");
-      captureId = `local-${safeUuid()}`;
+    if (!apiKey || !campaignId) {
+      ui?.notifications?.info("[TableCodex] API key or campaign ID missing. Starting local-only capture.");
+      sessionId = `local-${safeUuid()}`;
     } else {
       try {
-        const resp = await apiClient.startCapture(sessionId, {
-          captureMode,
-          world,
-          campaignId,
-          sessionTitle,
+        // Determine next session number from existing sessions.
+        let sessionNumber = 1;
+        try {
+          const sessions = await apiClient.getSessions(campaignId);
+          sessionNumber = Array.isArray(sessions) ? sessions.length + 1 : 1;
+        } catch {
+          // Non-fatal — session number defaults to 1.
+        }
+
+        const session = await apiClient.createSession(campaignId, {
+          title: sessionTitle,
+          sessionNumber,
         });
-        captureId = resp?.captureId ?? `local-${safeUuid()}`;
-        ui?.notifications?.info("[TableCodex] Capture started and connected to API.");
+        sessionId = String(session.id);
+        ui?.notifications?.info(`[TableCodex] Session "${sessionTitle}" created (Session ${sessionNumber}).`);
       } catch (err) {
-        logger.warn("API startCapture failed — falling back to local-only capture:", err);
-        ui?.notifications?.warn("[TableCodex] Could not connect to TableCodex API. Starting local-only capture.");
-        captureId = `local-${safeUuid()}`;
+        logger.warn("API createSession failed — falling back to local-only capture:", err);
+        ui?.notifications?.warn("[TableCodex] Could not create session via API. Starting local-only capture.");
+        sessionId = `local-${safeUuid()}`;
       }
     }
 
     await setSetting("campaignId", campaignId);
     await setSetting("sessionId", sessionId);
     await setSetting("sessionTitle", sessionTitle);
-    await setSetting("captureId", captureId);
     await setSetting("isCapturing", true);
 
     eventBuffer.start();
 
     this.addEvent({
-      sourceEventId: `session-started-${captureId}`,
+      sourceEventId: `session-started-${sessionId}`,
       eventType: "session.started",
       occurredAt: new Date().toISOString(),
       privacyLevel: "public",
@@ -70,8 +81,8 @@ class CaptureManager {
       raw: null,
     });
 
-    logger.log(`Capture started. captureId=${captureId}`);
-    Hooks.call("tablecodex.captureStarted", { captureId, sessionId, campaignId });
+    logger.log(`Capture started. sessionId=${sessionId}`);
+    Hooks.call("tablecodex.captureStarted", { sessionId, campaignId });
   }
 
   async stopCapture() {
@@ -81,8 +92,11 @@ class CaptureManager {
       return;
     }
 
+    const sessionId = getSetting("sessionId");
+    const worldId = getFoundryWorldContext().foundryWorldId;
+
     this.addEvent({
-      sourceEventId: `session-ended-${getSetting("captureId")}`,
+      sourceEventId: `session-ended-${sessionId}`,
       eventType: "session.ended",
       occurredAt: new Date().toISOString(),
       privacyLevel: "public",
@@ -90,32 +104,20 @@ class CaptureManager {
       speaker: null,
       scene: null,
       payload: {
-        captureId: getSetting("captureId"),
-        sessionId: getSetting("sessionId"),
-        archivedEventCount: getArchivedEventCount({
-          worldId: getFoundryWorldContext().foundryWorldId,
-          captureId: getSetting("captureId"),
-        }),
+        sessionId,
+        archivedEventCount: getArchivedEventCount({ worldId, sessionId }),
       },
       raw: null,
     });
 
     const apiKey = getSetting("apiKey");
-    const sessionId = getSetting("sessionId");
-    const captureId = getSetting("captureId");
+    const campaignId = getSetting("campaignId");
 
-    if (apiKey && sessionId) {
+    if (apiKey && campaignId && sessionId && !sessionId.startsWith("local-")) {
       try {
         await eventBuffer.flush();
-        await apiClient.endCapture(sessionId, {
-          captureId,
-          eventCount: getArchivedEventCount({
-            worldId: getFoundryWorldContext().foundryWorldId,
-            captureId,
-          }),
-        });
       } catch (err) {
-        logger.warn("API endCapture failed:", err);
+        logger.warn("Final flush failed on stop:", err);
       }
     }
 
@@ -123,26 +125,25 @@ class CaptureManager {
     await setSetting("isCapturing", false);
 
     logger.log("Capture stopped.");
-    ui?.notifications?.info("[TableCodex] Capture stopped. Use the panel to export your session.");
-    Hooks.call("tablecodex.captureStopped", { captureId });
+    ui?.notifications?.info("[TableCodex] Session capture stopped. Use the panel to export.");
+    Hooks.call("tablecodex.captureStopped", { sessionId });
   }
 
   addEvent(event) {
     if (!getSetting("isCapturing")) return;
-    // Only the GM client adds events to avoid duplicate sync from multiple connected clients.
     if (!game?.user?.isGM) return;
 
-    const captureId = getSetting("captureId");
+    const sessionId = getSetting("sessionId");
     const worldId = getFoundryWorldContext().foundryWorldId;
 
     const enriched = {
       ...event,
-      captureId: captureId || null,
+      sessionId: sessionId || null,
       clientCapturedAt: new Date().toISOString(),
     };
 
     eventBuffer.add(enriched);
-    appendArchivedEvent(enriched, { worldId, captureId });
+    appendArchivedEvent(enriched, { worldId, sessionId });
   }
 
   async syncNow() {
@@ -151,23 +152,21 @@ class CaptureManager {
   }
 
   getStatus() {
-    const captureId = getSetting("captureId");
+    const sessionId = getSetting("sessionId");
     const worldId = getFoundryWorldContext().foundryWorldId;
     return {
       isCapturing: getSetting("isCapturing") ?? false,
       campaignId: getSetting("campaignId") ?? "",
-      sessionId: getSetting("sessionId") ?? "",
+      sessionId: sessionId ?? "",
       sessionTitle: getSetting("sessionTitle") ?? "",
-      captureId: captureId ?? "",
       queuedEventCount: eventBuffer.getQueueCount(),
-      archivedEventCount: getArchivedEventCount({ worldId, captureId }),
+      archivedEventCount: getArchivedEventCount({ worldId, sessionId }),
       captureMode: getSetting("captureMode") ?? "standard",
     };
   }
 
   exportSessionMarkdown() {
     if (!requireGM("Export Session Markdown")) return;
-    // Defer import to avoid circular dependency at module load time.
     import("../export/export-session-dialog.js").then(({ openExportDialog }) => {
       openExportDialog();
     }).catch((err) => {
@@ -177,12 +176,12 @@ class CaptureManager {
 
   clearCurrentSessionArchive() {
     if (!requireGM("Clear Session Archive")) return;
-    const captureId = getSetting("captureId");
+    const sessionId = getSetting("sessionId");
     const worldId = getFoundryWorldContext().foundryWorldId;
-    clearArchivedEventsForCapture({ worldId, captureId });
+    clearArchivedEventsForSession({ worldId, sessionId });
     eventBuffer.clearAllEvents();
     ui?.notifications?.info("[TableCodex] Session archive cleared.");
-    Hooks.call("tablecodex.archiveCleared", { captureId });
+    Hooks.call("tablecodex.archiveCleared", { sessionId });
   }
 }
 

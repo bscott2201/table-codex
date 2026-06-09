@@ -12,10 +12,16 @@
     {{/if}}
   </div>
 
+  {{#if campaignName}}
+    <div class="tc-campaign-info">
+      <i class="fas fa-map"></i> {{campaignName}}
+    </div>
+  {{/if}}
+
   {{#if sessionTitle}}
     <div class="tc-session-info">
       <strong>{{sessionTitle}}</strong>
-      {{#if captureId}}<div class="tc-capture-id">{{captureId}}</div>{{/if}}
+      {{#if sessionId}}<div class="tc-capture-id">ID: {{sessionId}}</div>{{/if}}
     </div>
   {{/if}}
 

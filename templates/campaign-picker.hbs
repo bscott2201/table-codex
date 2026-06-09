@@ -1,0 +1,37 @@
+<form class="tc-campaign-picker">
+
+  {{#if error}}
+    <div class="tc-picker-error">
+      <p><i class="fas fa-exclamation-triangle"></i> Could not load campaigns.</p>
+      <p class="hint">{{error}}</p>
+      <p class="hint">Make sure your API key is saved in module settings.</p>
+    </div>
+
+  {{else if campaigns.length}}
+    <div class="form-group">
+      <label for="tc-campaign-select">Campaign</label>
+      <div class="form-fields">
+        <select id="tc-campaign-select" name="campaignId">
+          <option value="">— Select a campaign —</option>
+          {{#each campaigns}}
+            <option value="{{id}}" {{#if selected}}selected{{/if}}>
+              {{name}}{{#if system}} · {{system}}{{/if}}
+            </option>
+          {{/each}}
+        </select>
+      </div>
+    </div>
+    {{#if currentCampaignName}}
+      <p class="hint tc-picker-current">
+        <i class="fas fa-check-circle"></i> Active: <strong>{{currentCampaignName}}</strong> (ID: {{currentCampaignId}})
+      </p>
+    {{/if}}
+
+  {{else}}
+    <div class="tc-picker-empty">
+      <p><i class="fas fa-info-circle"></i> No campaigns found in your TableCodex account.</p>
+      <p class="hint">Create a campaign at table-codex.replit.app first, then come back here.</p>
+    </div>
+  {{/if}}
+
+</form>

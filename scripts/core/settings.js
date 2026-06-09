@@ -32,6 +32,13 @@ export function registerSettings() {
     default: "",
   });
 
+  game.settings.register(MODULE_ID, "campaignName", {
+    scope: "world",
+    config: false,
+    type: String,
+    default: "",
+  });
+
   game.settings.register(MODULE_ID, "sessionId", {
     scope: "world",
     config: false,
@@ -40,13 +47,6 @@ export function registerSettings() {
   });
 
   game.settings.register(MODULE_ID, "sessionTitle", {
-    scope: "world",
-    config: false,
-    type: String,
-    default: "",
-  });
-
-  game.settings.register(MODULE_ID, "captureId", {
     scope: "world",
     config: false,
     type: String,
@@ -90,13 +90,6 @@ export function registerSettings() {
     config: false,
     type: Boolean,
     default: false,
-  });
-
-  game.settings.register(MODULE_ID, "connectionVerifiedAt", {
-    scope: "world",
-    config: false,
-    type: String,
-    default: "",
   });
 
   logger.log("Settings registered.");

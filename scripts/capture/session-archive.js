@@ -1,14 +1,14 @@
 import { getJson, setJson } from "../core/storage.js";
 import { logger } from "../core/logger.js";
 
-export function getArchiveKey({ worldId, captureId } = {}) {
+export function getArchiveKey({ worldId, sessionId } = {}) {
   const w = worldId || "unknown-world";
-  const c = captureId || "manual-unsynced";
-  return `tablecodex.sessionArchive.${w}.${c}`;
+  const s = sessionId || "manual-unsynced";
+  return `tablecodex.sessionArchive.${w}.${s}`;
 }
 
-export function appendArchivedEvent(event, { worldId, captureId } = {}) {
-  const key = getArchiveKey({ worldId, captureId });
+export function appendArchivedEvent(event, { worldId, sessionId } = {}) {
+  const key = getArchiveKey({ worldId, sessionId });
   try {
     const existing = getJson(key, []);
     existing.push(event);
@@ -19,15 +19,13 @@ export function appendArchivedEvent(event, { worldId, captureId } = {}) {
   }
 }
 
-export function getArchivedEvents({ worldId, captureId } = {}) {
-  const key = getArchiveKey({ worldId, captureId });
+export function getArchivedEvents({ worldId, sessionId } = {}) {
+  const key = getArchiveKey({ worldId, sessionId });
   return getJson(key, []);
 }
 
-// Archive cleanup should later be handled by explicit user action (e.g. a "Clear Archive" button
-// in the panel). Do NOT auto-clear on capture end — the GM may want to export after stopping.
-export function clearArchivedEventsForCapture({ worldId, captureId } = {}) {
-  const key = getArchiveKey({ worldId, captureId });
+export function clearArchivedEventsForSession({ worldId, sessionId } = {}) {
+  const key = getArchiveKey({ worldId, sessionId });
   try {
     setJson(key, []);
   } catch (err) {
@@ -36,6 +34,6 @@ export function clearArchivedEventsForCapture({ worldId, captureId } = {}) {
   }
 }
 
-export function getArchivedEventCount({ worldId, captureId } = {}) {
-  return getArchivedEvents({ worldId, captureId }).length;
+export function getArchivedEventCount({ worldId, sessionId } = {}) {
+  return getArchivedEvents({ worldId, sessionId }).length;
 }

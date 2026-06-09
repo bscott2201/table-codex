@@ -6,11 +6,21 @@ import { registerCombatHooks } from "./hooks/combat-hooks.js";
 import { registerSceneHooks } from "./hooks/scene-hooks.js";
 import { registerActorHooks } from "./hooks/actor-hooks.js";
 import { openTableCodexPanel, refreshTableCodexPanel, promptSessionTitle } from "./ui/tablecodex-panel.js";
+import { CampaignPickerForm } from "./ui/campaign-picker.js";
 import { captureManager } from "./capture/capture-manager.js";
 
 Hooks.once("init", () => {
   logger.log(`Initializing ${MODULE_TITLE} v${game.modules.get(MODULE_ID)?.version ?? "?"}`);
   registerSettings();
+
+  game.settings.registerMenu(MODULE_ID, "campaignPicker", {
+    name: "Campaign",
+    label: "Select Campaign",
+    hint: "Choose which TableCodex campaign to sync Foundry sessions to.",
+    icon: "fas fa-map",
+    type: CampaignPickerForm,
+    restricted: true,
+  });
 });
 
 Hooks.once("ready", () => {
@@ -65,8 +75,7 @@ Hooks.on("getSceneControlButtons", (controls) => {
         const sessionTitle = await promptSessionTitle();
         if (sessionTitle === null) return;
         const campaignId = getSetting("campaignId") || "";
-        const sessionId = getSetting("sessionId") || "";
-        await captureManager.startCapture({ campaignId, sessionId, sessionTitle });
+        await captureManager.startCapture({ campaignId, sessionTitle });
       }
     },
   };
