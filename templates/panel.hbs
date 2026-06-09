@@ -1,0 +1,53 @@
+<div class="tablecodex-panel-inner">
+
+  <div class="tc-status-bar">
+    {{#if isCapturing}}
+      <span class="tc-status tc-status--active">
+        <i class="fas fa-circle tc-pulse"></i> Capturing
+      </span>
+    {{else}}
+      <span class="tc-status tc-status--idle">
+        <i class="fas fa-circle"></i> Idle
+      </span>
+    {{/if}}
+  </div>
+
+  {{#if sessionTitle}}
+    <div class="tc-session-info">
+      <strong>{{sessionTitle}}</strong>
+      {{#if captureId}}<div class="tc-capture-id">{{captureId}}</div>{{/if}}
+    </div>
+  {{/if}}
+
+  <div class="tc-stats">
+    <span title="Events archived locally"><i class="fas fa-archive"></i> {{archivedEventCount}}</span>
+    <span title="Events pending sync"><i class="fas fa-cloud-upload-alt"></i> {{queuedEventCount}}</span>
+    <span title="Capture mode"><i class="fas fa-sliders-h"></i> {{captureMode}}</span>
+  </div>
+
+  {{#if isGM}}
+    <div class="tc-actions">
+      {{#if isCapturing}}
+        <button data-action="stop-capture" class="tc-btn tc-btn--danger">
+          <i class="fas fa-stop"></i> Stop Capture
+        </button>
+        <button data-action="sync-now" class="tc-btn tc-btn--secondary">
+          <i class="fas fa-sync"></i> Sync Now
+        </button>
+      {{else}}
+        <button data-action="start-capture" class="tc-btn tc-btn--primary">
+          <i class="fas fa-circle"></i> Start Capture
+        </button>
+      {{/if}}
+
+      <button data-action="export-markdown" class="tc-btn tc-btn--secondary">
+        <i class="fas fa-file-download"></i> Export Markdown
+      </button>
+
+      <button data-action="clear-archive" class="tc-btn tc-btn--ghost">
+        <i class="fas fa-trash-alt"></i> Clear Archive
+      </button>
+    </div>
+  {{/if}}
+
+</div>

@@ -1,0 +1,50 @@
+{
+  "tablecodex-foundry": {
+    "settings": {
+      "apiBaseUrl": {
+        "name": "TableCodex API URL",
+        "hint": "Base URL for the TableCodex API server."
+      },
+      "apiKey": {
+        "name": "TableCodex API Key",
+        "hint": "Your TableCodex API key. Keep this secret."
+      },
+      "captureMode": {
+        "name": "Capture Mode",
+        "hint": "Controls how much detail is captured per event.",
+        "choices": {
+          "safe": "Safe — minimal data only",
+          "standard": "Standard — balanced detail",
+          "detailed": "Detailed — full payloads"
+        }
+      },
+      "captureWhispers": {
+        "name": "Capture Whispers",
+        "hint": "Include whispered chat messages in the session capture."
+      },
+      "captureHiddenNames": {
+        "name": "Capture Hidden Token Names",
+        "hint": "Include hidden token names in actor events."
+      }
+    },
+    "ui": {
+      "panelTitle": "TableCodex Sync",
+      "statusIdle": "Idle",
+      "statusCapturing": "Capturing",
+      "startCapture": "Start Capture",
+      "stopCapture": "Stop Capture",
+      "syncNow": "Sync Now",
+      "exportMarkdown": "Export Markdown",
+      "clearArchive": "Clear Archive"
+    },
+    "notifications": {
+      "captureStarted": "TableCodex capture started.",
+      "captureStopped": "TableCodex capture stopped.",
+      "exportSuccess": "Session exported successfully.",
+      "noEventsToExport": "No archived events found for the current capture.",
+      "archiveCleared": "Session archive cleared.",
+      "notGM": "This action is only available to the GM.",
+      "missingApiKey": "API key missing. Starting local-only capture for Markdown export."
+    }
+  }
+}

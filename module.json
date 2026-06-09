@@ -1,0 +1,28 @@
+{
+  "id": "tablecodex-foundry",
+  "title": "TableCodex Sync",
+  "description": "Capture Foundry VTT session events and sync/export them to TableCodex for recaps, timelines, and campaign memory.",
+  "version": "0.1.0",
+  "authors": [
+    {
+      "name": "TableCodex"
+    }
+  ],
+  "compatibility": {
+    "minimum": "14",
+    "verified": "14"
+  },
+  "esmodules": [
+    "scripts/main.js"
+  ],
+  "styles": [
+    "styles/tablecodex.css"
+  ],
+  "languages": [
+    {
+      "lang": "en",
+      "name": "English",
+      "path": "lang/en.json"
+    }
+  ]
+}
