@@ -4,6 +4,33 @@ import { getSetting, setSetting } from "../core/settings.js";
 import { requireGM } from "../core/permissions.js";
 import { logger } from "../core/logger.js";
 
+export function promptSessionTitle() {
+  return new Promise((resolve) => {
+    new Dialog({
+      title: "Start Session",
+      content: `
+        <div class="form-group">
+          <label>Session Title</label>
+          <input type="text" id="tc-session-title" placeholder="e.g. Session 12 — The Tomb" style="width:100%">
+        </div>
+      `,
+      buttons: {
+        start: {
+          icon: '<i class="fas fa-circle"></i>',
+          label: "Start",
+          callback: (html) => resolve(html.find("#tc-session-title").val()?.trim() || "Untitled Session"),
+        },
+        cancel: {
+          icon: '<i class="fas fa-times"></i>',
+          label: "Cancel",
+          callback: () => resolve(null),
+        },
+      },
+      default: "start",
+    }).render(true);
+  });
+}
+
 export class TableCodexPanel extends Application {
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
@@ -40,7 +67,7 @@ export class TableCodexPanel extends Application {
   async _onStartCapture() {
     if (!requireGM("Start Capture")) return;
 
-    const sessionTitle = await this._promptSessionTitle();
+    const sessionTitle = await promptSessionTitle();
     if (sessionTitle === null) return;
 
     const campaignId = getSetting("campaignId") || "";
@@ -78,32 +105,6 @@ export class TableCodexPanel extends Application {
     }
   }
 
-  async _promptSessionTitle() {
-    return new Promise((resolve) => {
-      new Dialog({
-        title: "Start Capture",
-        content: `
-          <div class="form-group">
-            <label>Session Title</label>
-            <input type="text" id="tc-session-title" placeholder="e.g. Session 12 — The Tomb" style="width:100%">
-          </div>
-        `,
-        buttons: {
-          start: {
-            icon: '<i class="fas fa-circle"></i>',
-            label: "Start",
-            callback: (html) => resolve(html.find("#tc-session-title").val()?.trim() || "Untitled Session"),
-          },
-          cancel: {
-            icon: '<i class="fas fa-times"></i>',
-            label: "Cancel",
-            callback: () => resolve(null),
-          },
-        },
-        default: "start",
-      }).render(true);
-    });
-  }
 }
 
 let _panelInstance = null;

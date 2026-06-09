@@ -1,11 +1,11 @@
 import { MODULE_ID, MODULE_TITLE } from "./constants.js";
-import { registerSettings } from "./core/settings.js";
+import { registerSettings, getSetting } from "./core/settings.js";
 import { logger } from "./core/logger.js";
 import { registerChatHooks } from "./hooks/chat-hooks.js";
 import { registerCombatHooks } from "./hooks/combat-hooks.js";
 import { registerSceneHooks } from "./hooks/scene-hooks.js";
 import { registerActorHooks } from "./hooks/actor-hooks.js";
-import { openTableCodexPanel, refreshTableCodexPanel } from "./ui/tablecodex-panel.js";
+import { openTableCodexPanel, refreshTableCodexPanel, promptSessionTitle } from "./ui/tablecodex-panel.js";
 import { captureManager } from "./capture/capture-manager.js";
 
 Hooks.once("init", () => {
@@ -21,9 +21,8 @@ Hooks.once("ready", () => {
   registerSceneHooks();
   registerActorHooks();
 
-  // Refresh the panel whenever capture state changes.
-  Hooks.on("tablecodex.captureStarted", refreshTableCodexPanel);
-  Hooks.on("tablecodex.captureStopped", refreshTableCodexPanel);
+  Hooks.on("tablecodex.captureStarted", () => { refreshTableCodexPanel(); ui.controls?.render(); });
+  Hooks.on("tablecodex.captureStopped", () => { refreshTableCodexPanel(); ui.controls?.render(); });
   Hooks.on("tablecodex.archiveCleared", refreshTableCodexPanel);
 
   // Warn if a previous capture was still marked active (e.g. after a page reload).
@@ -35,12 +34,13 @@ Hooks.once("ready", () => {
   }
 });
 
-// Add a button to the scene navigation controls for quick panel access (GM only).
 Hooks.on("getSceneControlButtons", (controls) => {
   if (!game.user?.isGM) return;
 
   const tokenControls = controls.find((c) => c.name === "token");
   if (!tokenControls) return;
+
+  const isCapturing = getSetting("isCapturing") ?? false;
 
   tokenControls.tools.push({
     name: "tablecodex",
@@ -48,5 +48,23 @@ Hooks.on("getSceneControlButtons", (controls) => {
     icon: "fas fa-scroll",
     button: true,
     onClick: () => openTableCodexPanel(),
+  });
+
+  tokenControls.tools.push({
+    name: "tablecodex-session",
+    title: isCapturing ? "Stop Session" : "Start Session",
+    icon: isCapturing ? "fas fa-stop" : "fas fa-circle",
+    button: true,
+    onClick: async () => {
+      if (getSetting("isCapturing")) {
+        await captureManager.stopCapture();
+      } else {
+        const sessionTitle = await promptSessionTitle();
+        if (sessionTitle === null) return;
+        const campaignId = getSetting("campaignId") || "";
+        const sessionId = getSetting("sessionId") || "";
+        await captureManager.startCapture({ campaignId, sessionId, sessionTitle });
+      }
+    },
   });
 });
