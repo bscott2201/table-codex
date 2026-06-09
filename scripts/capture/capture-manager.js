@@ -4,9 +4,9 @@ import { getSetting, setSetting } from "../core/settings.js";
 import { getFoundryWorldContext } from "../core/foundry-context.js";
 import { apiClient } from "../api/api-client.js";
 import { eventBuffer } from "./event-buffer.js";
+import { inactivityMonitor } from "../core/inactivity-monitor.js";
 import {
   appendArchivedEvent,
-  getArchivedEvents,
   clearArchivedEventsForSession,
   getArchivedEventCount,
 } from "./session-archive.js";
@@ -68,6 +68,7 @@ class CaptureManager {
     await setSetting("isCapturing", true);
 
     eventBuffer.start();
+    inactivityMonitor.start(() => this.stopCapture());
 
     this.addEvent({
       sourceEventId: `session-started-${sessionId}`,
@@ -121,6 +122,7 @@ class CaptureManager {
       }
     }
 
+    inactivityMonitor.stop();
     eventBuffer.stop();
     await setSetting("isCapturing", false);
 
@@ -142,6 +144,7 @@ class CaptureManager {
       clientCapturedAt: new Date().toISOString(),
     };
 
+    inactivityMonitor.ping();
     eventBuffer.add(enriched);
     appendArchivedEvent(enriched, { worldId, sessionId });
   }

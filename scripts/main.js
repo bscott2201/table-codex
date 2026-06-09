@@ -8,6 +8,7 @@ import { registerActorHooks } from "./hooks/actor-hooks.js";
 import { openTableCodexPanel, refreshTableCodexPanel, promptSessionTitle } from "./ui/tablecodex-panel.js";
 import { CampaignPickerForm } from "./ui/campaign-picker.js";
 import { captureManager } from "./capture/capture-manager.js";
+import { inactivityMonitor } from "./core/inactivity-monitor.js";
 
 Hooks.once("init", () => {
   logger.log(`Initializing ${MODULE_TITLE} v${game.modules.get(MODULE_ID)?.version ?? "?"}`);
@@ -35,14 +36,47 @@ Hooks.once("ready", () => {
   Hooks.on("tablecodex.captureStopped", () => { refreshTableCodexPanel(); ui.controls?.render(); });
   Hooks.on("tablecodex.archiveCleared", refreshTableCodexPanel);
 
-  // Warn if a previous capture was still marked active (e.g. after a page reload).
-  if (game.user?.isGM && game.settings.get(MODULE_ID, "isCapturing")) {
+  if (!game.user?.isGM) return;
+
+  const isCapturing = getSetting("isCapturing");
+
+  if (isCapturing) {
+    // Session was active before a page reload — resume the inactivity monitor.
     ui.notifications.warn(
-      "[TableCodex] A capture was active when the page last unloaded. " +
-      "Open the TableCodex panel to stop it or resume manually."
+      "[TableCodex] A session was active when the page last reloaded. " +
+      "Resuming capture — open the TableCodex panel to stop it."
     );
+    inactivityMonitor.start(() => captureManager.stopCapture());
+  } else {
+    // Prompt the GM to start a session after Foundry finishes loading.
+    setTimeout(_promptSessionStart, 2000);
   }
 });
+
+async function _promptSessionStart() {
+  const campaignId = getSetting("campaignId");
+  if (!campaignId) return; // No campaign configured — nothing to prompt.
+
+  const campaignName = getSetting("campaignName") || campaignId;
+
+  const start = await Dialog.confirm({
+    title: "Start a Session?",
+    content: `
+      <p>Welcome back! Would you like to start logging a new session for</p>
+      <p><strong>${campaignName}</strong>?</p>
+    `,
+    yes: () => true,
+    no: () => false,
+    defaultYes: true,
+  });
+
+  if (!start) return;
+
+  const sessionTitle = await promptSessionTitle();
+  if (sessionTitle === null) return;
+
+  await captureManager.startCapture({ campaignId, sessionTitle });
+}
 
 Hooks.on("getSceneControlButtons", (controls) => {
   if (!game.user?.isGM) return;
