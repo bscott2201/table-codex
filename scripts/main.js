@@ -37,25 +37,28 @@ Hooks.once("ready", () => {
 Hooks.on("getSceneControlButtons", (controls) => {
   if (!game.user?.isGM) return;
 
-  const tokenControls = controls.find((c) => c.name === "token");
-  if (!tokenControls) return;
+  // V14: controls is an object keyed by group name; V13 and earlier: array with .find()
+  const tokenGroup = Array.isArray(controls)
+    ? controls.find((c) => c.name === "token" || c.name === "tokens")
+    : (controls.tokens ?? controls.token);
+  if (!tokenGroup?.tools) return;
 
   const isCapturing = getSetting("isCapturing") ?? false;
 
-  tokenControls.tools.push({
+  const panelTool = {
     name: "tablecodex",
     title: "TableCodex",
     icon: "fas fa-scroll",
     button: true,
-    onClick: () => openTableCodexPanel(),
-  });
+    onChange: () => openTableCodexPanel(),
+  };
 
-  tokenControls.tools.push({
+  const sessionTool = {
     name: "tablecodex-session",
     title: isCapturing ? "Stop Session" : "Start Session",
     icon: isCapturing ? "fas fa-stop" : "fas fa-circle",
     button: true,
-    onClick: async () => {
+    onChange: async () => {
       if (getSetting("isCapturing")) {
         await captureManager.stopCapture();
       } else {
@@ -66,5 +69,12 @@ Hooks.on("getSceneControlButtons", (controls) => {
         await captureManager.startCapture({ campaignId, sessionId, sessionTitle });
       }
     },
-  });
+  };
+
+  if (Array.isArray(tokenGroup.tools)) {
+    tokenGroup.tools.push(panelTool, sessionTool);
+  } else {
+    tokenGroup.tools.tablecodex = panelTool;
+    tokenGroup.tools["tablecodex-session"] = sessionTool;
+  }
 });
