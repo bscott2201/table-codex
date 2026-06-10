@@ -4,7 +4,9 @@ import { logger } from "../core/logger.js";
 
 function getBaseUrl() {
   const raw = getSetting("apiBaseUrl") || DEFAULT_API_BASE_URL;
-  return raw.replace(/\/+$/, "");
+  // Strip trailing slashes and a trailing /api segment so callers that enter
+  // "https://example.com/api" and our own "/api/..." paths don't double up.
+  return raw.replace(/\/+$/, "").replace(/\/api$/i, "");
 }
 
 function getApiKey() {
