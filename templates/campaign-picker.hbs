@@ -4,7 +4,9 @@
     <div class="tc-picker-error">
       <p><i class="fas fa-exclamation-triangle"></i> Could not load campaigns.</p>
       <p class="hint">{{error}}</p>
-      <p class="hint">Make sure your API key is saved in module settings.</p>
+      <hr>
+      <p class="hint"><strong>If you see "Failed to fetch" or "CORS":</strong> the TableCodex API needs to allow requests from your Foundry origin. Add <code>Access-Control-Allow-Origin: *</code> to the API server's response headers.</p>
+      <p class="hint"><strong>If you see a 401:</strong> your API key is invalid or missing.</p>
     </div>
 
   {{else if campaigns.length}}

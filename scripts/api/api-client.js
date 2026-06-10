@@ -48,6 +48,16 @@ async function apiFetch(path, options = {}) {
     });
     return await handleResponse(res);
   } catch (err) {
+    // "Failed to fetch" is the browser's CORS/network error — give a clear message.
+    if (err instanceof TypeError && err.message === "Failed to fetch") {
+      const friendly = new Error(
+        `Cannot reach the TableCodex API (${getBaseUrl()}). ` +
+        `This is usually a CORS error — the API must allow requests from your Foundry origin. ` +
+        `Check the browser console Network tab for a blocked preflight request.`
+      );
+      logger.error(`API request failed [${options.method ?? "GET"} ${path}]:`, friendly.message);
+      throw friendly;
+    }
     logger.error(`API request failed [${options.method ?? "GET"} ${path}]:`, err);
     throw err;
   }
