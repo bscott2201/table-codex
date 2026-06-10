@@ -31,9 +31,9 @@ async function handleResponse(res) {
     body = text;
   }
   if (!res.ok) {
-    const message = (typeof body === "object" && body?.message)
-      ? body.message
-      : (typeof body === "string" ? body : `HTTP ${res.status}`);
+    const message = (typeof body === "object")
+      ? (body?.message ?? body?.error ?? `HTTP ${res.status}`)
+      : (typeof body === "string" && body.trim() && !body.trim().startsWith("<") ? body.trim() : `HTTP ${res.status}`);
     throw new Error(`TableCodex API error ${res.status}: ${message}`);
   }
   return body;

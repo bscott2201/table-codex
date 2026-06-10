@@ -5,8 +5,8 @@
       <p><i class="fas fa-exclamation-triangle"></i> Could not load campaigns.</p>
       <p class="hint">{{error}}</p>
       <hr>
-      <p class="hint"><strong>If you see "Failed to fetch" or "CORS":</strong> the TableCodex API needs to allow requests from your Foundry origin. Add <code>Access-Control-Allow-Origin: *</code> to the API server's response headers.</p>
-      <p class="hint"><strong>If you see a 401:</strong> your API key is invalid or missing.</p>
+      <p class="hint"><strong>401 Unauthorized:</strong> your API key is invalid or not yet created. Log into the TableCodex web app, go to Settings → API Keys, generate a key with the <code>campaigns:read</code> and <code>vtt:write</code> scopes, then paste it into the TableCodex module settings in Foundry.</p>
+      <p class="hint"><strong>Failed to fetch / CORS:</strong> the API server must return <code>Access-Control-Allow-Origin: *</code> headers.</p>
     </div>
 
   {{else if campaigns.length}}
