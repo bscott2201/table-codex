@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.6 — Exporter Syntax Fix
+
+**Root cause:** `_buildMarkdown` in `exporter.js` contained raw em dash characters (`—`, U+2014) inside `${...}` template expressions (lines 391, 433). Foundry's Electron V8 build rejected these as a `SyntaxError: Missing } in template expression`, which caused the entire import chain to fail — no hooks, no settings, no UI.
+
+**Fix:** `_buildMarkdown` completely rewritten using plain string concatenation (`+`) and indexed `for` loops. No template literals, no raw non-ASCII inside expressions. Em dash defined as `var DASH = "—"` (a safe Unicode escape) and used only in string concatenation context.
+
+**Also replaced** in the rest of `exporter.js`: all template literals in non-Markdown code replaced with `+` concatenation for safety. `??` and `||` operators inside `${}` removed. `Object.assign` used instead of spread in `forceSyncSession` for older-V8 compatibility.
+
+All 10 JS files pass `node --check` after this fix.
+
 ## 0.3.5 — Hook Registration Fix
 
 **Root cause fixed:** `class TableCodexPanelMenuShim extends FormApplication` was at module scope (line 16 of main.js). ESModule top-level code executes at parse time — before `init` fires, before Foundry's class globals are ready. If `FormApplication` is undefined at that instant the whole file throws and zero hooks register, which matched the observed symptom exactly.

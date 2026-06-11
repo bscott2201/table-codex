@@ -1,3 +1,8 @@
+// TableCodex Sync — exporter.js
+// Note: _buildMarkdown uses array + string concatenation throughout.
+// Template literals are intentionally avoided inside that function to prevent
+// any engine-specific parsing issues with non-ASCII characters in ${...}.
+
 import { MODULE_ID, getSetting, cleanToken } from "./settings.js";
 import { sessionRecorder } from "./session-recorder.js";
 import { apiClient, validateReadyToSync, validateApiCredentials } from "./api-client.js";
@@ -11,6 +16,8 @@ import {
 } from "./session-store.js";
 import { log, debug } from "./logger.js";
 
+console.log("[TableCodex Sync] exporter.js evaluated");
+
 // ---------------------------------------------------------------------------
 // Pre-flight validation
 // ---------------------------------------------------------------------------
@@ -23,8 +30,11 @@ function _validatePayloadFields(payload) {
     startedAt:        payload.startedAt,
   };
   return Object.entries(required)
-    .filter(([, v]) => !v || typeof v !== "string" || !v.trim())
-    .map(([k]) => k);
+    .filter(function(entry) {
+      var v = entry[1];
+      return !v || typeof v !== "string" || !v.trim();
+    })
+    .map(function(entry) { return entry[0]; });
 }
 
 // ---------------------------------------------------------------------------
@@ -32,9 +42,9 @@ function _validatePayloadFields(payload) {
 // ---------------------------------------------------------------------------
 
 function _download(content, filename, mimeType) {
-  const blob = new Blob([content], { type: mimeType });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement("a");
+  var blob = new Blob([content], { type: mimeType });
+  var url  = URL.createObjectURL(blob);
+  var a    = document.createElement("a");
   a.href     = url;
   a.download = filename;
   document.body.appendChild(a);
@@ -44,15 +54,18 @@ function _download(content, filename, mimeType) {
 }
 
 function _filename(worldName, date, localSessionId, ext) {
-  const slug = (worldName ?? "world").replace(/[^a-z0-9]/gi, "-").toLowerCase();
-  return `tablecodex-session-${slug}-${date}-${localSessionId}.${ext}`;
+  var slug = (worldName || "world").replace(/[^a-z0-9]/gi, "-").toLowerCase();
+  return "tablecodex-session-" + slug + "-" + date + "-" + localSessionId + "." + ext;
 }
 
 function _currentFilename(ext) {
-  const wi   = getWorldInfo();
-  const sess = sessionRecorder.session;
-  const date = sess?.startedAt ? sess.startedAt.slice(0, 10) : new Date().toISOString().slice(0, 10);
-  return _filename(wi.foundryWorldName, date, sess?.localSessionId ?? "unsaved", ext);
+  var wi   = getWorldInfo();
+  var sess = sessionRecorder.session;
+  var date = sess && sess.startedAt
+    ? sess.startedAt.slice(0, 10)
+    : new Date().toISOString().slice(0, 10);
+  var id = (sess && sess.localSessionId) ? sess.localSessionId : "unsaved";
+  return _filename(wi.foundryWorldName, date, id, ext);
 }
 
 // ---------------------------------------------------------------------------
@@ -60,25 +73,23 @@ function _currentFilename(ext) {
 // ---------------------------------------------------------------------------
 
 export function exportJson() {
-  if (!(getSetting("selectedCampaignId") ?? "").trim()) {
+  if (!(getSetting("selectedCampaignId") || "").trim()) {
     ui.notifications.warn(game.i18n.localize("TABLECODEX.Warn.NoCampaignExport"));
   }
 
-  const payload = sessionRecorder.buildPayload();
-  const missing = _validatePayloadFields(payload);
+  var payload = sessionRecorder.buildPayload();
+  var missing = _validatePayloadFields(payload);
   if (missing.length > 0) {
-    const msg = `Cannot export: missing ${missing.join(", ")}.`;
-    ui.notifications.error(`TableCodex: ${msg}`);
-    log("exportJson blocked —", msg);
+    var msg = "Cannot export: missing " + missing.join(", ") + ".";
+    ui.notifications.error("TableCodex: " + msg);
+    log("exportJson blocked:", msg);
     return;
   }
 
-  debug("exportJson —",
-    `foundryWorldId: ${payload.foundryWorldId},`,
-    `localSessionId: ${payload.localSessionId},`,
-    `events: ${payload.summary?.eventCount ?? 0},`,
-    `chat: ${payload.summary?.chatMessageCount ?? 0},`,
-    `rolls: ${payload.summary?.rollCount ?? 0}`
+  debug("exportJson",
+    "foundryWorldId:", payload.foundryWorldId,
+    "localSessionId:", payload.localSessionId,
+    "events:", (payload.summary && payload.summary.eventCount) || 0
   );
 
   _download(JSON.stringify(payload, null, 2), _currentFilename("json"), "application/json");
@@ -91,10 +102,10 @@ export function exportJson() {
 // ---------------------------------------------------------------------------
 
 export function exportMarkdown() {
-  if (!(getSetting("selectedCampaignId") ?? "").trim()) {
+  if (!(getSetting("selectedCampaignId") || "").trim()) {
     ui.notifications.warn(game.i18n.localize("TABLECODEX.Warn.NoCampaignExport"));
   }
-  const payload = sessionRecorder.buildPayload();
+  var payload = sessionRecorder.buildPayload();
   _download(_buildMarkdown(payload), _currentFilename("md"), "text/markdown");
   log("Markdown export complete.");
   ui.notifications.info(game.i18n.localize("TABLECODEX.Notify.ExportMdOk"));
@@ -105,30 +116,30 @@ export function exportMarkdown() {
 // ---------------------------------------------------------------------------
 
 export function exportUnsyncedJson(localSessionId) {
-  const rec = _getRecord(localSessionId);
+  var rec = _getRecord(localSessionId);
   if (!rec) return;
-  const payload = rec.normalizedPayload ?? _minimalPayload(rec);
-  const date = rec.startedAt ? rec.startedAt.slice(0, 10) : "unknown";
+  var payload = rec.normalizedPayload || _minimalPayload(rec);
+  var date = rec.startedAt ? rec.startedAt.slice(0, 10) : "unknown";
   _download(
     JSON.stringify(payload, null, 2),
     _filename(rec.foundryWorldName, date, localSessionId, "json"),
     "application/json"
   );
-  log(`Exported unsynced session ${localSessionId} as JSON.`);
+  log("Exported unsynced session " + localSessionId + " as JSON.");
   ui.notifications.info(game.i18n.localize("TABLECODEX.Notify.ExportJsonOk"));
 }
 
 export function exportUnsyncedMarkdown(localSessionId) {
-  const rec = _getRecord(localSessionId);
+  var rec = _getRecord(localSessionId);
   if (!rec) return;
-  const payload = rec.normalizedPayload ?? _minimalPayload(rec);
-  const date = rec.startedAt ? rec.startedAt.slice(0, 10) : "unknown";
+  var payload = rec.normalizedPayload || _minimalPayload(rec);
+  var date = rec.startedAt ? rec.startedAt.slice(0, 10) : "unknown";
   _download(
     _buildMarkdown(payload),
     _filename(rec.foundryWorldName, date, localSessionId, "md"),
     "text/markdown"
   );
-  log(`Exported unsynced session ${localSessionId} as Markdown.`);
+  log("Exported unsynced session " + localSessionId + " as Markdown.");
   ui.notifications.info(game.i18n.localize("TABLECODEX.Notify.ExportMdOk"));
 }
 
@@ -137,54 +148,51 @@ export function exportUnsyncedMarkdown(localSessionId) {
 // ---------------------------------------------------------------------------
 
 export async function syncSession() {
-  const invalid = validateReadyToSync();
+  var invalid = validateReadyToSync();
   if (invalid) {
-    ui.notifications.warn(`TableCodex: ${invalid}`);
+    ui.notifications.warn("TableCodex: " + invalid);
     return { success: false, error: invalid };
   }
 
-  const sess = sessionRecorder.session;
+  var sess = sessionRecorder.session;
   if (!sess) {
-    const msg = game.i18n.localize("TABLECODEX.Error.NoSession");
-    ui.notifications.warn(`TableCodex: ${msg}`);
+    var msg = game.i18n.localize("TABLECODEX.Error.NoSession");
+    ui.notifications.warn("TableCodex: " + msg);
     return { success: false, error: msg };
   }
 
-  const normalizedPayload = sessionRecorder.buildPayload();
-  const missing = _validatePayloadFields(normalizedPayload);
+  var normalizedPayload = sessionRecorder.buildPayload();
+  var missing = _validatePayloadFields(normalizedPayload);
   if (missing.length > 0) {
-    const msg = `Cannot sync: missing ${missing.join(", ")}.`;
-    ui.notifications.error(`TableCodex: ${msg}`);
-    log("syncSession blocked —", msg);
-    return { success: false, error: msg };
+    var blockMsg = "Cannot sync: missing " + missing.join(", ") + ".";
+    ui.notifications.error("TableCodex: " + blockMsg);
+    log("syncSession blocked:", blockMsg);
+    return { success: false, error: blockMsg };
   }
 
-  const wi         = getWorldInfo();
-  const campaignId = getSetting("selectedCampaignId") ?? "";
-  const envelope   = _buildEnvelope(wi, campaignId, sess, normalizedPayload);
+  var wi         = getWorldInfo();
+  var campaignId = getSetting("selectedCampaignId") || "";
+  var envelope   = _buildEnvelope(wi, campaignId, sess, normalizedPayload);
 
-  debug("syncSession envelope —",
-    `campaignId: ${campaignId},`,
-    `foundryWorldId: ${wi.foundryWorldId},`,
-    `localSessionId: ${sess.localSessionId},`,
-    `startedAt: ${sess.startedAt},`,
-    `events: ${normalizedPayload.summary?.eventCount ?? 0},`,
-    `chat: ${normalizedPayload.summary?.chatMessageCount ?? 0},`,
-    `rolls: ${normalizedPayload.summary?.rollCount ?? 0}`
+  debug("syncSession",
+    "campaignId:", campaignId,
+    "foundryWorldId:", wi.foundryWorldId,
+    "localSessionId:", sess.localSessionId,
+    "events:", (normalizedPayload.summary && normalizedPayload.summary.eventCount) || 0
   );
 
-  if (JSON.stringify(envelope).length > 5_000_000) {
+  if (JSON.stringify(envelope).length > 5000000) {
     ui.notifications.warn(game.i18n.localize("TABLECODEX.Warn.LargePayload"));
   }
 
   await markSessionPending(sess.localSessionId);
+  var result = await apiClient.syncSession(envelope);
 
-  const result = await apiClient.syncSession(envelope);
   if (result.success && result.importId) {
     sessionRecorder.markSynced(result.importId);
     await markSessionSynced(sess.localSessionId, result.importId);
   } else {
-    await markSessionFailed(sess.localSessionId, result.error ?? "Unknown error");
+    await markSessionFailed(sess.localSessionId, result.error || "Unknown error");
   }
   return result;
 }
@@ -193,117 +201,113 @@ export async function syncSession() {
 // Retry / Force sync — stored sessions
 // ---------------------------------------------------------------------------
 
-// Retry uses the stored normalizedPayload verbatim.
-// Falls through to force sync if payload is missing.
 export async function retrySyncSession(localSessionId) {
-  const rec = _getRecord(localSessionId);
+  var rec = _getRecord(localSessionId);
   if (!rec) {
     ui.notifications.error("TableCodex: Session record not found.");
     return { success: false, error: "Record not found" };
   }
 
-  const credErr = validateApiCredentials();
+  var credErr = validateApiCredentials();
   if (credErr) {
-    ui.notifications.warn(`TableCodex: ${credErr}`);
+    ui.notifications.warn("TableCodex: " + credErr);
     return { success: false, error: credErr };
   }
 
-  const campaignId = rec.campaignId || (getSetting("selectedCampaignId") ?? "");
+  var campaignId = rec.campaignId || (getSetting("selectedCampaignId") || "");
   if (!campaignId) {
     ui.notifications.warn("TableCodex: Select a campaign before retrying sync.");
     return { success: false, error: "No campaign selected" };
   }
 
-  // Fall through to force-sync if no stored payload
   if (!rec.normalizedPayload) {
-    log(`retrySyncSession: ${localSessionId} has no stored payload — running force sync.`);
+    log("retrySyncSession: " + localSessionId + " has no stored payload — running force sync.");
     return forceSyncSession(localSessionId);
   }
 
-  const wi       = getWorldInfo();
-  const envelope = _buildEnvelope(wi, campaignId, rec, rec.normalizedPayload);
+  var wi       = getWorldInfo();
+  var envelope = _buildEnvelope(wi, campaignId, rec, rec.normalizedPayload);
 
-  debug("retrySyncSession —",
-    `localSessionId: ${localSessionId},`,
-    `campaignId: ${campaignId},`,
-    `foundryWorldId: ${wi.foundryWorldId},`,
-    `events: ${rec.summary?.eventCount ?? "?"},`,
-    `chat: ${rec.summary?.chatMessageCount ?? "?"},`,
-    `rolls: ${rec.summary?.rollCount ?? "?"}`
+  debug("retrySyncSession",
+    "localSessionId:", localSessionId,
+    "campaignId:", campaignId,
+    "foundryWorldId:", wi.foundryWorldId
   );
 
   await markSessionPending(localSessionId);
-  const result = await apiClient.syncSession(envelope);
+  var result = await apiClient.syncSession(envelope);
 
   if (result.success && result.importId) {
     await markSessionSynced(localSessionId, result.importId);
-    log(`retrySyncSession: ${localSessionId} synced → importId: ${result.importId}`);
+    log("retrySyncSession: " + localSessionId + " synced, importId: " + result.importId);
   } else {
-    await markSessionFailed(localSessionId, result.error ?? "Unknown error");
+    await markSessionFailed(localSessionId, result.error || "Unknown error");
   }
   return result;
 }
 
-// Force sync rebuilds the envelope injecting current campaign + world info.
-// Works even if the stored payload has empty campaignId or world fields.
 export async function forceSyncSession(localSessionId) {
-  const rec = _getRecord(localSessionId);
+  var rec = _getRecord(localSessionId);
   if (!rec) {
     ui.notifications.error("TableCodex: Session record not found.");
     return { success: false, error: "Record not found" };
   }
 
-  const credErr = validateApiCredentials();
+  var credErr = validateApiCredentials();
   if (credErr) {
-    ui.notifications.warn(`TableCodex: ${credErr}`);
+    ui.notifications.warn("TableCodex: " + credErr);
     return { success: false, error: credErr };
   }
 
-  // Prefer stored campaignId, fall back to current setting
-  const campaignId = rec.campaignId || (getSetting("selectedCampaignId") ?? "");
+  var campaignId = rec.campaignId || (getSetting("selectedCampaignId") || "");
   if (!campaignId) {
     ui.notifications.warn("TableCodex: Select a campaign before force syncing.");
     return { success: false, error: "No campaign selected" };
   }
 
-  const wi = getWorldInfo();
+  var wi = getWorldInfo();
+  var selectedCampaignName = getSetting("selectedCampaignName") || "";
 
-  // Patch the stored normalizedPayload's flat fields so they're complete
-  const innerPayload = rec.normalizedPayload
-    ? {
-        ...rec.normalizedPayload,
-        campaignId,
-        campaignName: rec.campaignName || getSetting("selectedCampaignName") || "",
-        foundryWorldId:   wi.foundryWorldId,
-        foundryWorldName: wi.foundryWorldName,
-        foundryVersion:   wi.foundryVersion,
-        systemId:         wi.systemId,
-        moduleVersion:    wi.moduleVersion,
-        world: { id: wi.foundryWorldId, name: wi.foundryWorldName },
-        tablecodex: {
-          campaignId,
-          campaignName: rec.campaignName || getSetting("selectedCampaignName") || "",
-        },
-      }
-    : _minimalPayload({ ...rec, campaignId, foundryWorldId: wi.foundryWorldId, foundryWorldName: wi.foundryWorldName });
+  var innerPayload;
+  if (rec.normalizedPayload) {
+    innerPayload = Object.assign({}, rec.normalizedPayload, {
+      campaignId:       campaignId,
+      campaignName:     rec.campaignName || selectedCampaignName,
+      foundryWorldId:   wi.foundryWorldId,
+      foundryWorldName: wi.foundryWorldName,
+      foundryVersion:   wi.foundryVersion,
+      systemId:         wi.systemId,
+      moduleVersion:    wi.moduleVersion,
+      world:            { id: wi.foundryWorldId, name: wi.foundryWorldName },
+      tablecodex: {
+        campaignId:   campaignId,
+        campaignName: rec.campaignName || selectedCampaignName,
+      },
+    });
+  } else {
+    innerPayload = _minimalPayload(Object.assign({}, rec, {
+      campaignId:       campaignId,
+      foundryWorldId:   wi.foundryWorldId,
+      foundryWorldName: wi.foundryWorldName,
+    }));
+  }
 
-  const envelope = _buildEnvelope(wi, campaignId, rec, innerPayload);
+  var envelope = _buildEnvelope(wi, campaignId, rec, innerPayload);
 
-  debug("forceSyncSession —",
-    `localSessionId: ${localSessionId},`,
-    `campaignId: ${campaignId},`,
-    `foundryWorldId: ${wi.foundryWorldId},`,
-    `events: ${rec.summary?.eventCount ?? "?"}`
+  debug("forceSyncSession",
+    "localSessionId:", localSessionId,
+    "campaignId:", campaignId,
+    "foundryWorldId:", wi.foundryWorldId
   );
 
   await markSessionPending(localSessionId);
-  const result = await apiClient.syncSession(envelope);
+  var result = await apiClient.syncSession(envelope);
 
   if (result.success && result.importId) {
     await markSessionSynced(localSessionId, result.importId);
-    log(`forceSyncSession: ${localSessionId} synced → importId: ${result.importId}`);
+    log("forceSyncSession: " + localSessionId + " synced, importId: " + result.importId);
   } else {
-    await markSessionFailed(localSessionId, result.error ?? "Unknown error");
+    await markSessionFailed(localSessionId, result.error || "Unknown error");
   }
   return result;
 }
@@ -313,12 +317,16 @@ export async function forceSyncSession(localSessionId) {
 // ---------------------------------------------------------------------------
 
 function _getRecord(localSessionId) {
-  return getUnsyncedSessions().find((s) => s.localSessionId === localSessionId) ?? null;
+  var sessions = getUnsyncedSessions();
+  for (var i = 0; i < sessions.length; i++) {
+    if (sessions[i].localSessionId === localSessionId) return sessions[i];
+  }
+  return null;
 }
 
 function _buildEnvelope(wi, campaignId, sessOrRecord, normalizedPayload) {
   return {
-    campaignId,
+    campaignId:       campaignId,
     foundryWorldId:   wi.foundryWorldId,
     foundryWorldName: wi.foundryWorldName,
     foundryVersion:   wi.foundryVersion,
@@ -326,7 +334,7 @@ function _buildEnvelope(wi, campaignId, sessOrRecord, normalizedPayload) {
     moduleVersion:    wi.moduleVersion,
     localSessionId:   sessOrRecord.localSessionId,
     startedAt:        sessOrRecord.startedAt,
-    endedAt:          sessOrRecord.endedAt ?? "",
+    endedAt:          sessOrRecord.endedAt || "",
     source:           "api_sync",
     payload:          normalizedPayload,
   };
@@ -337,25 +345,25 @@ function _minimalPayload(rec) {
     schemaVersion:    "1.0.0",
     source:           "foundry_vtt",
     moduleId:         MODULE_ID,
-    moduleVersion:    rec.moduleVersion ?? "0.3.0",
-    foundryWorldId:   rec.foundryWorldId ?? "",
-    foundryWorldName: rec.foundryWorldName ?? "",
-    foundryVersion:   rec.foundryVersion ?? "",
-    systemId:         rec.systemId ?? "",
-    campaignId:       rec.campaignId ?? "",
-    campaignName:     rec.campaignName ?? "",
+    moduleVersion:    rec.moduleVersion || "0.3.5",
+    foundryWorldId:   rec.foundryWorldId || "",
+    foundryWorldName: rec.foundryWorldName || "",
+    foundryVersion:   rec.foundryVersion || "",
+    systemId:         rec.systemId || "",
+    campaignId:       rec.campaignId || "",
+    campaignName:     rec.campaignName || "",
     localSessionId:   rec.localSessionId,
     startedAt:        rec.startedAt,
-    endedAt:          rec.endedAt ?? "",
-    world:            { id: rec.foundryWorldId ?? "", name: rec.foundryWorldName ?? "" },
-    tablecodex:       { campaignId: rec.campaignId ?? "", campaignName: rec.campaignName ?? "" },
+    endedAt:          rec.endedAt || "",
+    world:            { id: rec.foundryWorldId || "", name: rec.foundryWorldName || "" },
+    tablecodex:       { campaignId: rec.campaignId || "", campaignName: rec.campaignName || "" },
     session: {
       localSessionId: rec.localSessionId,
-      sessionTitle:   rec.sessionTitle ?? "",
+      sessionTitle:   rec.sessionTitle || "",
       startedAt:      rec.startedAt,
-      endedAt:        rec.endedAt ?? "",
+      endedAt:        rec.endedAt || "",
     },
-    summary:      rec.summary ?? {},
+    summary:      rec.summary || {},
     events:       [],
     chatMessages: [],
     rolls:        [],
@@ -368,86 +376,107 @@ function _minimalPayload(rec) {
 }
 
 // ---------------------------------------------------------------------------
-// Markdown builder
+// Markdown builder — pure string concatenation, no template literals,
+// no raw Unicode characters. Em dash represented as "—".
 // ---------------------------------------------------------------------------
 
 function _buildMarkdown(p) {
-  const lines = [];
-  const sess  = p.session ?? {};
+  var DASH = "—";
+  var lines = [];
+  var sess  = p.session || {};
 
-  lines.push(`# TableCodex Session Export`);
-  lines.push(``);
-  lines.push(`## Session Metadata`);
-  lines.push(``);
-  lines.push(`| Field | Value |`);
-  lines.push(`|---|---|`);
-  lines.push(`| Session ID | ${p.localSessionId ?? sess.localSessionId} |`);
-  if (sess.sessionTitle) lines.push(`| Title | ${sess.sessionTitle} |`);
-  lines.push(`| World | ${p.foundryWorldName} (${p.foundryWorldId}) |`);
-  if (p.campaignName) lines.push(`| Campaign | ${p.campaignName} |`);
-  lines.push(`| System | ${p.systemId} |`);
-  lines.push(`| Foundry Version | ${p.foundryVersion} |`);
-  lines.push(`| Started | ${p.startedAt ?? sess.startedAt} |`);
-  lines.push(`| Ended | ${p.endedAt ?? sess.endedAt || "—"} |`);
-  if (sess.timezone) lines.push(`| Timezone | ${sess.timezone} |`);
-  lines.push(`| Module Version | ${p.moduleVersion} |`);
-  lines.push(``);
+  lines.push("# TableCodex Session Export");
+  lines.push("");
+  lines.push("## Session Metadata");
+  lines.push("");
+  lines.push("| Field | Value |");
+  lines.push("|---|---|");
+  lines.push("| Session ID | " + (p.localSessionId || sess.localSessionId || "") + " |");
+  if (sess.sessionTitle) {
+    lines.push("| Title | " + sess.sessionTitle + " |");
+  }
+  lines.push("| World | " + (p.foundryWorldName || "") + " (" + (p.foundryWorldId || "") + ") |");
+  if (p.campaignName) {
+    lines.push("| Campaign | " + p.campaignName + " |");
+  }
+  lines.push("| System | " + (p.systemId || "") + " |");
+  lines.push("| Foundry Version | " + (p.foundryVersion || "") + " |");
+  lines.push("| Started | " + (p.startedAt || sess.startedAt || "") + " |");
+  lines.push("| Ended | " + (p.endedAt || sess.endedAt || DASH) + " |");
+  if (sess.timezone) {
+    lines.push("| Timezone | " + sess.timezone + " |");
+  }
+  lines.push("| Module Version | " + (p.moduleVersion || "") + " |");
+  lines.push("");
 
-  const s = p.summary ?? {};
+  var s = p.summary || {};
   if (Object.keys(s).length > 0) {
-    lines.push(`## Summary`);
-    lines.push(``);
-    lines.push(`- **Total events**: ${s.eventCount ?? 0}`);
-    lines.push(`- **Chat messages**: ${s.chatMessageCount ?? 0}`);
-    lines.push(`- **Rolls**: ${s.rollCount ?? 0}`);
-    lines.push(`- **Combat events**: ${s.combatEventCount ?? 0}`);
-    lines.push(`- **Actor snapshots**: ${s.actorSnapshotCount ?? 0}`);
-    lines.push(`- **Scene snapshots**: ${s.sceneSnapshotCount ?? 0}`);
-    lines.push(``);
+    lines.push("## Summary");
+    lines.push("");
+    lines.push("- **Total events**: " + (s.eventCount || 0));
+    lines.push("- **Chat messages**: " + (s.chatMessageCount || 0));
+    lines.push("- **Rolls**: " + (s.rollCount || 0));
+    lines.push("- **Combat events**: " + (s.combatEventCount || 0));
+    lines.push("- **Actor snapshots**: " + (s.actorSnapshotCount || 0));
+    lines.push("- **Scene snapshots**: " + (s.sceneSnapshotCount || 0));
+    lines.push("");
   }
 
-  const msgs = p.chatMessages ?? [];
+  var msgs = p.chatMessages || [];
   if (msgs.length > 0) {
-    lines.push(`## Chat Transcript`);
-    lines.push(``);
-    for (const msg of msgs) {
-      const who     = msg.speaker?.actorName ?? msg.speaker?.userName ?? "Unknown";
-      const time    = msg.timestamp ? msg.timestamp.slice(11, 19) : "";
-      const prefix  = msg.isWhisper ? `*[Whisper]* ` : "";
-      const content = (msg.content ?? "").replace(/<[^>]*>/g, "").trim();
-      lines.push(`**${who}** *(${time})* ${prefix}${content}`);
-      if (msg.flavor) lines.push(`> ${msg.flavor}`);
-      lines.push(``);
+    lines.push("## Chat Transcript");
+    lines.push("");
+    for (var i = 0; i < msgs.length; i++) {
+      var msg     = msgs[i];
+      var spk     = msg.speaker || {};
+      var who     = spk.actorName || spk.userName || "Unknown";
+      var time    = msg.timestamp ? msg.timestamp.slice(11, 19) : "";
+      var prefix  = msg.isWhisper ? "*[Whisper]* " : "";
+      var content = (msg.content || "").replace(/<[^>]*>/g, "").trim();
+      lines.push("**" + who + "** *(" + time + ")* " + prefix + content);
+      if (msg.flavor) {
+        lines.push("> " + msg.flavor);
+      }
+      lines.push("");
     }
   }
 
-  const rolls = p.rolls ?? [];
+  var rolls = p.rolls || [];
   if (rolls.length > 0) {
-    lines.push(`## Rolls`);
-    lines.push(``);
-    lines.push(`| Time | Who | Formula | Total |`);
-    lines.push(`|---|---|---|---|`);
-    for (const r of rolls) {
-      const who  = r.speaker?.actorName ?? r.speaker?.userName ?? "—";
-      const time = r.timestamp ? r.timestamp.slice(11, 19) : "";
-      lines.push(`| ${time} | ${who} | ${r.formula} | ${r.total ?? "—"} |`);
+    lines.push("## Rolls");
+    lines.push("");
+    lines.push("| Time | Who | Formula | Total |");
+    lines.push("|---|---|---|---|");
+    for (var r = 0; r < rolls.length; r++) {
+      var roll = rolls[r];
+      var rSpk  = roll.speaker || {};
+      var rWho  = rSpk.actorName || rSpk.userName || DASH;
+      var rTime = roll.timestamp ? roll.timestamp.slice(11, 19) : "";
+      var rTot  = (roll.total !== null && roll.total !== undefined) ? roll.total : DASH;
+      lines.push("| " + rTime + " | " + rWho + " | " + (roll.formula || "") + " | " + rTot + " |");
     }
-    lines.push(``);
+    lines.push("");
   }
 
-  const combats = p.combats ?? [];
+  var combats = p.combats || [];
   if (combats.length > 0) {
-    lines.push(`## Combat Timeline`);
-    lines.push(``);
-    for (const c of combats) {
-      const time = c.timestamp ? c.timestamp.slice(11, 19) : "";
-      lines.push(`- **${c.subtype}** *(${time})* — Scene: ${c.sceneName ?? c.scene ?? "?"}, Round ${c.round}, Turn ${c.turn}`);
+    lines.push("## Combat Timeline");
+    lines.push("");
+    for (var c = 0; c < combats.length; c++) {
+      var cb   = combats[c];
+      var cTime = cb.timestamp ? cb.timestamp.slice(11, 19) : "";
+      var scene = cb.sceneName || cb.scene || "?";
+      lines.push(
+        "- **" + (cb.subtype || "") + "** *(" + cTime + ")* " + DASH +
+        " Scene: " + scene + ", Round " + (cb.round || 0) + ", Turn " + (cb.turn || 0)
+      );
     }
-    lines.push(``);
+    lines.push("");
   }
 
-  lines.push(`---`);
-  lines.push(`*Generated by TableCodex Sync v${p.moduleVersion}*`);
-  lines.push(``);
+  lines.push("---");
+  lines.push("*Generated by TableCodex Sync v" + (p.moduleVersion || "") + "*");
+  lines.push("");
+
   return lines.join("\n");
 }
