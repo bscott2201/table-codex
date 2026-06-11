@@ -1,4 +1,4 @@
-import { MODULE_ID, getSetting, setSetting, cleanToken } from "./settings.js";
+import { MODULE_ID, getSetting, setSetting, cleanToken, getSelectedCampaignIdForApi } from "./settings.js";
 import { log, debug } from "./logger.js";
 import { getWorldInfo } from "./world-info.js";
 
@@ -193,10 +193,19 @@ export const apiClient = {
 
   // Step 3 — confirm campaign + world pairing. Requires a selected campaign.
   async linkWorld() {
-    const campaignId = _safeCampaignId();
-    if (!campaignId) {
+    // Validate string presence first (for UI feedback)
+    if (!_safeCampaignId()) {
       const msg = "Select a TableCodex campaign before linking this world.";
       ui.notifications.warn(`TableCodex: ${msg}`);
+      return { success: false, error: msg };
+    }
+
+    // Coerce to number — API schema requires campaignId: number
+    const campaignId = getSelectedCampaignIdForApi();
+    if (campaignId === null) {
+      const rawId = getSetting("selectedCampaignId");
+      const msg = `Campaign ID "${rawId}" could not be parsed as a number. Re-select the campaign.`;
+      ui.notifications.error(`TableCodex: ${msg}`);
       return { success: false, error: msg };
     }
 
@@ -227,9 +236,9 @@ export const apiClient = {
 
     debug("linkWorld — url:", buildApiUrl("/integrations/foundry/connect"));
     debug("linkWorld — body:", JSON.stringify(body));
-    debug(`linkWorld — campaignId: ${campaignId}, campaignName: ${campaignName}`);
-    debug(`linkWorld — foundryWorldId: ${wi.foundryWorldId}, foundryWorldName: ${wi.foundryWorldName}`);
-    debug(`linkWorld — systemId: ${wi.systemId}, foundryVersion: ${wi.foundryVersion}, moduleVersion: ${wi.moduleVersion}`);
+    debug(`linkWorld — campaignId raw: "${getSetting("selectedCampaignId")}", parsed: ${campaignId}, type: ${typeof campaignId}`);
+    debug(`linkWorld — campaignName: ${campaignName}`);
+    debug(`linkWorld — foundryWorldId: ${wi.foundryWorldId}, systemId: ${wi.systemId}`);
 
     try {
       const result = await _request("POST", "/integrations/foundry/connect", body);

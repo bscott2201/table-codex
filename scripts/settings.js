@@ -1,7 +1,7 @@
 export const MODULE_ID = "tablecodex-sync";
 export const MODULE_TITLE = "TableCodex Sync";
 export const SCHEMA_VERSION = "1.0.0";
-export const MODULE_VERSION = "0.3.6";
+export const MODULE_VERSION = "0.3.7";
 
 console.log("[TableCodex Sync] settings.js evaluated");
 
@@ -197,6 +197,18 @@ export function getSetting(key) {
 
 export function setSetting(key, value) {
   return game.settings.set(MODULE_ID, key, value);
+}
+
+/**
+ * Returns the selected campaign ID coerced to a number for API payloads.
+ * The API schema expects campaignId: number, not string.
+ * Returns null if the stored value is missing or cannot be parsed as a finite number.
+ */
+export function getSelectedCampaignIdForApi() {
+  const raw = getSetting("selectedCampaignId");
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return parsed;
 }
 
 export function getPrivacySettings() {

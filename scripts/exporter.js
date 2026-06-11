@@ -3,7 +3,7 @@
 // Template literals are intentionally avoided inside that function to prevent
 // any engine-specific parsing issues with non-ASCII characters in ${...}.
 
-import { MODULE_ID, getSetting, cleanToken } from "./settings.js";
+import { MODULE_ID, getSetting, cleanToken, getSelectedCampaignIdForApi } from "./settings.js";
 import { sessionRecorder } from "./session-recorder.js";
 import { apiClient, validateReadyToSync, validateApiCredentials } from "./api-client.js";
 import { getWorldInfo } from "./world-info.js";
@@ -171,11 +171,21 @@ export async function syncSession() {
   }
 
   var wi         = getWorldInfo();
-  var campaignId = getSetting("selectedCampaignId") || "";
-  var envelope   = _buildEnvelope(wi, campaignId, sess, normalizedPayload);
+  var campaignId = getSelectedCampaignIdForApi();
+
+  if (campaignId === null) {
+    var rawCampaignId = getSetting("selectedCampaignId");
+    var badIdMsg = "Campaign ID \"" + rawCampaignId + "\" could not be parsed as a number. Re-select the campaign.";
+    ui.notifications.error("TableCodex: " + badIdMsg);
+    return { success: false, error: badIdMsg };
+  }
+
+  var envelope = _buildEnvelope(wi, campaignId, sess, normalizedPayload);
 
   debug("syncSession",
-    "campaignId:", campaignId,
+    "campaignId raw:", getSetting("selectedCampaignId"),
+    "parsed:", campaignId,
+    "type:", typeof campaignId,
     "foundryWorldId:", wi.foundryWorldId,
     "localSessionId:", sess.localSessionId,
     "events:", (normalizedPayload.summary && normalizedPayload.summary.eventCount) || 0
@@ -214,10 +224,16 @@ export async function retrySyncSession(localSessionId) {
     return { success: false, error: credErr };
   }
 
-  var campaignId = rec.campaignId || (getSetting("selectedCampaignId") || "");
-  if (!campaignId) {
+  // Resolve campaignId as number — prefer stored record, fall back to current setting
+  var rawCampaignId = rec.campaignId || (getSetting("selectedCampaignId") || "");
+  if (!rawCampaignId) {
     ui.notifications.warn("TableCodex: Select a campaign before retrying sync.");
     return { success: false, error: "No campaign selected" };
+  }
+  var campaignId = Number(rawCampaignId);
+  if (!Number.isFinite(campaignId) || campaignId <= 0) {
+    ui.notifications.error("TableCodex: Campaign ID \"" + rawCampaignId + "\" is not a valid number. Re-select the campaign.");
+    return { success: false, error: "Invalid campaign ID" };
   }
 
   if (!rec.normalizedPayload) {
@@ -228,6 +244,11 @@ export async function retrySyncSession(localSessionId) {
   var wi       = getWorldInfo();
   var envelope = _buildEnvelope(wi, campaignId, rec, rec.normalizedPayload);
 
+  debug("retrySyncSession",
+    "campaignId raw:", rawCampaignId,
+    "parsed:", campaignId,
+    "type:", typeof campaignId
+  );
   debug("retrySyncSession",
     "localSessionId:", localSessionId,
     "campaignId:", campaignId,
@@ -259,11 +280,22 @@ export async function forceSyncSession(localSessionId) {
     return { success: false, error: credErr };
   }
 
-  var campaignId = rec.campaignId || (getSetting("selectedCampaignId") || "");
-  if (!campaignId) {
+  var rawForceCampaignId = rec.campaignId || (getSetting("selectedCampaignId") || "");
+  if (!rawForceCampaignId) {
     ui.notifications.warn("TableCodex: Select a campaign before force syncing.");
     return { success: false, error: "No campaign selected" };
   }
+  var campaignId = Number(rawForceCampaignId);
+  if (!Number.isFinite(campaignId) || campaignId <= 0) {
+    ui.notifications.error("TableCodex: Campaign ID \"" + rawForceCampaignId + "\" is not a valid number. Re-select the campaign.");
+    return { success: false, error: "Invalid campaign ID" };
+  }
+
+  debug("forceSyncSession",
+    "campaignId raw:", rawForceCampaignId,
+    "parsed:", campaignId,
+    "type:", typeof campaignId
+  );
 
   var wi = getWorldInfo();
   var selectedCampaignName = getSetting("selectedCampaignName") || "";

@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.3.7 — campaignId Type Fix
+
+**Root cause:** `selectedCampaignId` is stored as a string in Foundry settings (settings system only accepts `String` type). The TableCodex API schema requires `campaignId: number`. Every API call was sending `campaignId: "6"` when the server expected `campaignId: 6`.
+
+**New helper in `settings.js`:** `getSelectedCampaignIdForApi()` — reads the raw string, coerces with `Number()`, returns `null` if the result is not a finite positive number.
+
+**`api-client.js` `linkWorld`:** uses `getSelectedCampaignIdForApi()`; if it returns null, blocks with "Campaign ID X could not be parsed as a number. Re-select the campaign."
+
+**`exporter.js` `syncSession`:** same guard — uses `getSelectedCampaignIdForApi()`, blocks if null.
+
+**`exporter.js` `retrySyncSession` / `forceSyncSession`:** coerces `rec.campaignId || getSetting(...)` through `Number()` with the same null-check guard.
+
+**Debug logging:** all three sync paths now log `campaignId raw: "6", parsed: 6, type: number` so the coercion is always visible.
+
+**JSON export unchanged** — `buildPayload()` can keep `campaignId` as string for the local export file; only API sync paths use the numeric form.
+
 ## 0.3.6 — Exporter Syntax Fix
 
 **Root cause:** `_buildMarkdown` in `exporter.js` contained raw em dash characters (`—`, U+2014) inside `${...}` template expressions (lines 391, 433). Foundry's Electron V8 build rejected these as a `SyntaxError: Missing } in template expression`, which caused the entire import chain to fail — no hooks, no settings, no UI.
