@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.9 — Payload Array Logging
+
+Added `console.log` in `syncSession` immediately before the POST fires. Logs the envelope's top-level keys and the length of every array in the nested payload object so it's easy to confirm data was captured before it hits the server.
+
 ## 0.3.8 — Sync Success / Intake Flow
 
 **New response shape handled:** `POST /session-import` may now return `{ importId, intakeId, status, message }` in addition to the legacy `{ importId }` shape. Both shapes work.

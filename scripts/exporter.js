@@ -191,6 +191,22 @@ export async function syncSession() {
     "events:", (normalizedPayload.summary && normalizedPayload.summary.eventCount) || 0
   );
 
+  // Log envelope shape and payload array lengths before sending
+  var p = envelope.payload || {};
+  console.log(
+    "[TableCodex Sync] syncSession pre-flight",
+    "\n  envelope keys:", Object.keys(envelope).join(", "),
+    "\n  payload keys:", Object.keys(p).join(", "),
+    "\n  payload.events.length:", (p.events || []).length,
+    "\n  payload.chatMessages.length:", (p.chatMessages || []).length,
+    "\n  payload.rolls.length:", (p.rolls || []).length,
+    "\n  payload.combats.length:", (p.combats || []).length,
+    "\n  payload.actors.length:", (p.actors || []).length,
+    "\n  payload.items.length:", (p.items || []).length,
+    "\n  payload.scenes.length:", (p.scenes || []).length,
+    "\n  payload.journals.length:", (p.journals || []).length
+  );
+
   if (JSON.stringify(envelope).length > 5000000) {
     ui.notifications.warn(game.i18n.localize("TABLECODEX.Warn.LargePayload"));
   }
