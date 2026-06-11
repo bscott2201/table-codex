@@ -1,0 +1,81 @@
+<div class="tablecodex-panel-wrap">
+
+  <header class="tc-header">
+    <span class="tc-logo"><i class="fas fa-scroll"></i></span>
+    <span class="tc-title">TableCodex Sync</span>
+    {{#if isActive}}
+      <span class="tc-badge tc-badge--recording">● Recording</span>
+    {{else if hasSession}}
+      <span class="tc-badge tc-badge--stopped">Stopped</span>
+    {{else}}
+      <span class="tc-badge tc-badge--idle">Idle</span>
+    {{/if}}
+  </header>
+
+  {{#if hasSession}}
+  <section class="tc-section">
+    <h4>{{localize "TABLECODEX.Panel.SessionInfo"}}</h4>
+    <dl class="tc-dl">
+      {{#if sessionTitle}}<dt>Title</dt><dd>{{sessionTitle}}</dd>{{/if}}
+      <dt>ID</dt><dd class="tc-mono">{{localSessionId}}</dd>
+      <dt>Started</dt><dd>{{startedAt}}</dd>
+      {{#unless isActive}}<dt>Ended</dt><dd>{{endedAt}}</dd>{{/unless}}
+      {{#if synced}}<dt>Import ID</dt><dd class="tc-mono">{{remoteImportId}}</dd>{{/if}}
+    </dl>
+  </section>
+
+  <section class="tc-section">
+    <h4>{{localize "TABLECODEX.Panel.Captured"}}</h4>
+    <ul class="tc-stats">
+      <li><i class="fas fa-comment"></i> {{stats.chatMessageCount}} {{localize "TABLECODEX.Panel.ChatMessages"}}</li>
+      <li><i class="fas fa-dice"></i> {{stats.rollCount}} {{localize "TABLECODEX.Panel.Rolls"}}</li>
+      <li><i class="fas fa-swords"></i> {{stats.combatEventCount}} {{localize "TABLECODEX.Panel.CombatEvents"}}</li>
+      <li><i class="fas fa-map"></i> {{stats.sceneSnapshotCount}} {{localize "TABLECODEX.Panel.Scenes"}}</li>
+      <li><i class="fas fa-user"></i> {{stats.actorSnapshotCount}} {{localize "TABLECODEX.Panel.ActorSnapshots"}}</li>
+      <li><i class="fas fa-book"></i> {{stats.journalSnapshotCount}} {{localize "TABLECODEX.Panel.Journals"}}</li>
+    </ul>
+  </section>
+  {{/if}}
+
+  <section class="tc-section tc-actions">
+    {{#if isActive}}
+      <button data-action="end-session" class="tc-btn tc-btn--danger">
+        <i class="fas fa-stop-circle"></i> {{localize "TABLECODEX.Panel.EndSession"}}
+      </button>
+    {{else}}
+      <button data-action="start-session" class="tc-btn tc-btn--primary">
+        <i class="fas fa-circle"></i> {{localize "TABLECODEX.Panel.StartSession"}}
+      </button>
+    {{/if}}
+
+    {{#if hasSession}}
+    <div class="tc-action-row">
+      <button data-action="export-json" class="tc-btn">
+        <i class="fas fa-file-code"></i> {{localize "TABLECODEX.Panel.ExportJson"}}
+      </button>
+      <button data-action="export-md" class="tc-btn">
+        <i class="fas fa-file-alt"></i> {{localize "TABLECODEX.Panel.ExportMd"}}
+      </button>
+    </div>
+    <div class="tc-action-row">
+      <button data-action="sync-session" class="tc-btn tc-btn--accent" {{#if synced}}title="Already synced — will re-sync"{{/if}}>
+        <i class="fas fa-cloud-upload-alt"></i>
+        {{#if synced}}{{localize "TABLECODEX.Panel.ReSync"}}{{else}}{{localize "TABLECODEX.Panel.Sync"}}{{/if}}
+      </button>
+      <button data-action="clear-buffer" class="tc-btn tc-btn--muted">
+        <i class="fas fa-trash"></i> {{localize "TABLECODEX.Panel.Clear"}}
+      </button>
+    </div>
+    {{/if}}
+  </section>
+
+  <footer class="tc-footer">
+    <button data-action="test-connection" class="tc-btn tc-btn--sm">
+      <i class="fas fa-plug"></i> {{localize "TABLECODEX.Panel.TestConnection"}}
+    </button>
+    <button data-action="open-settings" class="tc-btn tc-btn--sm">
+      <i class="fas fa-cog"></i> {{localize "TABLECODEX.Panel.Settings"}}
+    </button>
+  </footer>
+
+</div>

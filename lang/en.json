@@ -1,50 +1,127 @@
 {
-  "tablecodex-foundry": {
-    "settings": {
-      "apiBaseUrl": {
-        "name": "TableCodex API URL",
-        "hint": "Base URL for the TableCodex API server."
+  "TABLECODEX": {
+    "Settings": {
+      "Section": {
+        "Api": "API Connection",
+        "Privacy": "Privacy",
+        "Capture": "Capture Options"
       },
-      "apiKey": {
-        "name": "TableCodex API Key",
-        "hint": "Your TableCodex API key. Keep this secret."
+      "ApiUrl": {
+        "Name": "TableCodex API URL",
+        "Hint": "Base URL of your TableCodex instance (e.g. https://app.tablecodex.com)."
       },
-      "captureMode": {
-        "name": "Capture Mode",
-        "hint": "Controls how much detail is captured per event.",
-        "choices": {
-          "safe": "Safe — minimal data only",
-          "standard": "Standard — balanced detail",
-          "detailed": "Detailed — full payloads"
-        }
+      "ApiToken": {
+        "Name": "API Token",
+        "Hint": "Your TableCodex API token. Found in TableCodex → Settings → Integrations."
       },
-      "captureWhispers": {
-        "name": "Capture Whispers",
-        "hint": "Include whispered chat messages in the session capture."
+      "WorldId": {
+        "Name": "Foundry World ID",
+        "Hint": "Automatically populated from the current world."
       },
-      "captureHiddenNames": {
-        "name": "Capture Hidden Token Names",
-        "hint": "Include hidden token names in actor events."
+      "WorldName": {
+        "Name": "Foundry World Name",
+        "Hint": "Automatically populated from the current world."
+      },
+      "CaptureWhispers": {
+        "Name": "Capture Whispers",
+        "Hint": "Include whispered chat messages in the session export. Default: off."
+      },
+      "CapturePrivateRolls": {
+        "Name": "Capture Private Rolls",
+        "Hint": "Include GM-only and blind rolls in the session export. Default: off."
+      },
+      "CaptureJournalText": {
+        "Name": "Capture Journal Text",
+        "Hint": "Include full journal page text in the session export. Default: off."
+      },
+      "CaptureActorSnapshots": {
+        "Name": "Capture Actor Snapshots",
+        "Hint": "Record actor summaries at session start/end and on creation/update."
+      },
+      "CaptureItemSnapshots": {
+        "Name": "Capture Item Snapshots",
+        "Hint": "Record item summaries at session start/end and on creation/update."
+      },
+      "CaptureSceneSnapshots": {
+        "Name": "Capture Scene Snapshots",
+        "Hint": "Record scene info at session start/end."
+      },
+      "AutoSync": {
+        "Name": "Auto-Sync on Session End",
+        "Hint": "Automatically POST the session to TableCodex when you end it."
+      },
+      "DebugLogging": {
+        "Name": "Debug Logging",
+        "Hint": "Log verbose capture events to the browser console."
       }
     },
-    "ui": {
-      "panelTitle": "TableCodex Sync",
-      "statusIdle": "Idle",
-      "statusCapturing": "Capturing",
-      "startCapture": "Start Capture",
-      "stopCapture": "Stop Capture",
-      "syncNow": "Sync Now",
-      "exportMarkdown": "Export Markdown",
-      "clearArchive": "Clear Archive"
+    "Panel": {
+      "SessionInfo": "Session",
+      "Captured": "Captured",
+      "ChatMessages": "chat messages",
+      "Rolls": "rolls",
+      "CombatEvents": "combat events",
+      "Scenes": "scenes",
+      "ActorSnapshots": "actor snapshots",
+      "ItemSnapshots": "item snapshots",
+      "Journals": "journals",
+      "StartSession": "Start Session",
+      "EndSession": "End Session",
+      "ExportJson": "Export JSON",
+      "ExportMd": "Export Markdown",
+      "Sync": "Sync to TableCodex",
+      "ReSync": "Re-Sync",
+      "Clear": "Clear Buffer",
+      "TestConnection": "Test Connection",
+      "Settings": "Settings"
     },
-    "notifications": {
-      "captureStarted": "TableCodex capture started.",
-      "captureStopped": "TableCodex capture stopped.",
-      "exportSuccess": "Session exported successfully.",
-      "noEventsToExport": "No archived events found for the current capture.",
-      "archiveCleared": "Session archive cleared.",
-      "notGM": "This action is only available to the GM.",
-      "missingApiKey": "API key missing. Starting local-only capture for Markdown export."
+    "Controls": {
+      "StartSession": "Start TC Session",
+      "StopSession": "Stop TC Session"
+    },
+    "Session": {
+      "AlreadyActive": "A TableCodex session is already active.",
+      "NotActive": "No TableCodex session is currently active.",
+      "Started": "TableCodex session started.",
+      "Ended": "TableCodex session ended.",
+      "BufferCleared": "TableCodex session buffer cleared."
+    },
+    "Dialog": {
+      "EndSession": {
+        "Title": "End Session",
+        "Content": "End the current TableCodex session? You can still export or sync after ending."
+      },
+      "ClearBuffer": {
+        "Title": "Clear Session Buffer",
+        "Content": "This will permanently delete the current session buffer. This cannot be undone."
+      },
+      "SessionTitle": {
+        "Title": "Start Session",
+        "Label": "Session Title",
+        "Placeholder": "e.g. The Siege of Thornwall",
+        "Start": "Start"
+      }
+    },
+    "Notify": {
+      "ConnectionOk": "TableCodex: Connection successful.",
+      "ConnectionFailed": "TableCodex: Connection failed",
+      "SyncOk": "TableCodex: Session synced successfully.",
+      "SyncFailed": "TableCodex: Sync failed",
+      "ExportJsonOk": "TableCodex: JSON exported.",
+      "ExportMdOk": "TableCodex: Markdown exported.",
+      "SessionResumed": "TableCodex: Resumed active session from before reload.",
+      "SessionPendingExport": "TableCodex: You have an unsaved session ready to export or sync."
+    },
+    "Warn": {
+      "LargePayload": "TableCodex: Session payload is large (>5 MB). Sync may be slow."
+    },
+    "Error": {
+      "NoApiUrl": "TableCodex API URL is not configured.",
+      "NoApiToken": "TableCodex API token is not configured."
+    },
+    "ExportSummary": {
+      "Intro": "Your session contains:",
+      "Choose": "Choose an export format below."
     }
   }
 }

@@ -1,0 +1,224 @@
+/* TableCodex Sync — Module Styles */
+
+/* ── Panel wrapper ─────────────────────────────────────────────────────── */
+.tablecodex-panel-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--color-text-primary, #f0ece3);
+}
+
+/* ── Header ────────────────────────────────────────────────────────────── */
+.tc-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--color-border-light, #444);
+}
+
+.tc-logo {
+  font-size: 1.1rem;
+  color: var(--color-warm-2, #c9a45c);
+}
+
+.tc-title {
+  font-family: var(--font-primary, serif);
+  font-weight: 700;
+  font-size: 0.95rem;
+  flex: 1;
+}
+
+/* ── Badges ────────────────────────────────────────────────────────────── */
+.tc-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.15rem 0.4rem;
+  border-radius: 3px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.tc-badge--recording {
+  background: #c0392b;
+  color: #fff;
+  animation: tc-pulse 2s infinite;
+}
+
+.tc-badge--stopped {
+  background: #555;
+  color: #ccc;
+}
+
+.tc-badge--idle {
+  background: #2c3e50;
+  color: #95a5a6;
+}
+
+@keyframes tc-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* ── Sections ──────────────────────────────────────────────────────────── */
+.tc-section {
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--color-border-light, #333);
+}
+
+.tc-section:last-child {
+  border-bottom: none;
+}
+
+.tc-section h4 {
+  margin: 0 0 0.35rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-warm-2, #c9a45c);
+}
+
+/* ── Definition list ───────────────────────────────────────────────────── */
+.tc-dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.15rem 0.6rem;
+  margin: 0;
+}
+
+.tc-dl dt {
+  color: var(--color-text-secondary, #999);
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.tc-dl dd {
+  margin: 0;
+  font-size: 0.8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tc-mono {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.72rem !important;
+  color: #7ec8e3;
+}
+
+/* ── Stats list ────────────────────────────────────────────────────────── */
+.tc-stats {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.tc-stats li {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+}
+
+.tc-stats li i {
+  width: 14px;
+  text-align: center;
+  color: var(--color-warm-2, #c9a45c);
+  font-size: 0.75rem;
+}
+
+/* ── Buttons ───────────────────────────────────────────────────────────── */
+.tc-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.tc-action-row {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.tc-action-row .tc-btn {
+  flex: 1;
+}
+
+.tc-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.6rem;
+  font-size: 0.8rem;
+  border: 1px solid var(--color-border-light, #555);
+  border-radius: 3px;
+  cursor: pointer;
+  background: var(--color-bg-btn, #2a2a2a);
+  color: var(--color-text-primary, #e0dcd3);
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.tc-btn:hover {
+  background: var(--color-bg-btn-hover, #3a3a3a);
+  border-color: var(--color-warm-2, #c9a45c);
+}
+
+.tc-btn--primary {
+  background: #1a5e2f;
+  border-color: #27ae60;
+  color: #fff;
+}
+
+.tc-btn--primary:hover {
+  background: #217a3d;
+}
+
+.tc-btn--danger {
+  background: #6b1a1a;
+  border-color: #c0392b;
+  color: #fff;
+}
+
+.tc-btn--danger:hover {
+  background: #8b2020;
+}
+
+.tc-btn--accent {
+  background: #1a3a6e;
+  border-color: #2980b9;
+  color: #fff;
+}
+
+.tc-btn--accent:hover {
+  background: #204a8a;
+}
+
+.tc-btn--muted {
+  background: transparent;
+  border-color: #444;
+  color: #888;
+}
+
+.tc-btn--muted:hover {
+  background: #2a2a2a;
+  color: #ccc;
+}
+
+.tc-btn--sm {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+}
+
+/* ── Footer ────────────────────────────────────────────────────────────── */
+.tc-footer {
+  display: flex;
+  gap: 0.35rem;
+  justify-content: flex-end;
+  padding-top: 0.2rem;
+}

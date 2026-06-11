@@ -1,123 +1,200 @@
-import { MODULE_ID, MODULE_TITLE } from "./constants.js";
-import { registerSettings, getSetting } from "./core/settings.js";
-import { logger } from "./core/logger.js";
-import { registerChatHooks } from "./hooks/chat-hooks.js";
-import { registerCombatHooks } from "./hooks/combat-hooks.js";
-import { registerSceneHooks } from "./hooks/scene-hooks.js";
-import { registerActorHooks } from "./hooks/actor-hooks.js";
-import { openTableCodexPanel, refreshTableCodexPanel, promptSessionTitle } from "./ui/tablecodex-panel.js";
-import { CampaignPickerForm } from "./ui/campaign-picker.js";
-import { captureManager } from "./capture/capture-manager.js";
-import { inactivityMonitor } from "./core/inactivity-monitor.js";
+import { MODULE_ID, MODULE_TITLE, registerSettings, getSetting, setSetting } from "./settings.js";
+import { log, debug } from "./logger.js";
+import { sessionRecorder } from "./session-recorder.js";
+import { normalizeChat, normalizeCombatEvent, normalizeSceneView, normalizeActorEvent, normalizeItemEvent, normalizeJournalEvent } from "./event-normalizer.js";
+import { openPanel, refreshPanel, injectSceneControls } from "./ui.js";
+
+// ---------------------------------------------------------------------------
+// Init
+// ---------------------------------------------------------------------------
 
 Hooks.once("init", () => {
-  logger.log(`Initializing ${MODULE_TITLE} v${game.modules.get(MODULE_ID)?.version ?? "?"}`);
+  log(`Initializing ${MODULE_TITLE}`);
   registerSettings();
-
-  game.settings.registerMenu(MODULE_ID, "campaignPicker", {
-    name: "Campaign",
-    label: "Select Campaign",
-    hint: "Choose which TableCodex campaign to sync Foundry sessions to.",
-    icon: "fas fa-map",
-    type: CampaignPickerForm,
-    restricted: true,
-  });
 });
 
-Hooks.once("ready", () => {
-  logger.log("Ready.");
+// ---------------------------------------------------------------------------
+// Ready
+// ---------------------------------------------------------------------------
 
-  registerChatHooks();
-  registerCombatHooks();
-  registerSceneHooks();
-  registerActorHooks();
+Hooks.once("ready", async () => {
+  log("Ready.");
 
-  Hooks.on("tablecodex.captureStarted", () => { refreshTableCodexPanel(); ui.controls?.render(); });
-  Hooks.on("tablecodex.captureStopped", () => { refreshTableCodexPanel(); ui.controls?.render(); });
-  Hooks.on("tablecodex.archiveCleared", refreshTableCodexPanel);
+  // Store world info in settings for payload use
+  try {
+    await setSetting("foundryWorldId", game.world?.id ?? "");
+    await setSetting("foundryWorldName", game.world?.title ?? "");
+  } catch { /* ignore */ }
 
-  if (!game.user?.isGM) return;
-
-  const isCapturing = getSetting("isCapturing");
-
-  if (isCapturing) {
-    // Session was active before a page reload — resume the inactivity monitor.
-    ui.notifications.warn(
-      "[TableCodex] A session was active when the page last reloaded. " +
-      "Resuming capture — open the TableCodex panel to stop it."
-    );
-    inactivityMonitor.start(() => captureManager.stopCapture());
-  } else {
-    // Prompt the GM to start a session after Foundry finishes loading.
-    setTimeout(_promptSessionStart, 2000);
+  // GM-only: check for an active session that survived a page reload
+  if (game.user?.isGM) {
+    const buf = getSetting("localSessionBuffer");
+    if (buf?.session?.active) {
+      await sessionRecorder.resume();
+      ui.notifications.warn(game.i18n.localize("TABLECODEX.Notify.SessionResumed"));
+    } else if (buf?.session && !buf.session.active) {
+      ui.notifications.info(game.i18n.localize("TABLECODEX.Notify.SessionPendingExport"));
+    }
   }
+
+  // Subscribe to session events to keep UI in sync
+  Hooks.on(`${MODULE_ID}.sessionStarted`, refreshPanel);
+  Hooks.on(`${MODULE_ID}.sessionStopped`, refreshPanel);
+  Hooks.on(`${MODULE_ID}.bufferCleared`, refreshPanel);
+
+  _registerCaptureHooks();
 });
 
-async function _promptSessionStart() {
-  const campaignId = getSetting("campaignId");
-  if (!campaignId) return; // No campaign configured — nothing to prompt.
+// ---------------------------------------------------------------------------
+// Scene controls
+// ---------------------------------------------------------------------------
 
-  const campaignName = getSetting("campaignName") || campaignId;
+Hooks.on("getSceneControlButtons", injectSceneControls);
 
-  const start = await Dialog.confirm({
-    title: "Start a Session?",
-    content: `
-      <p>Welcome back! Would you like to start logging a new session for</p>
-      <p><strong>${campaignName}</strong>?</p>
-    `,
-    yes: () => true,
-    no: () => false,
-    defaultYes: true,
+// ---------------------------------------------------------------------------
+// Event capture hooks
+// ---------------------------------------------------------------------------
+
+function _registerCaptureHooks() {
+  // --- Chat ---
+  Hooks.on("createChatMessage", (message) => {
+    if (!sessionRecorder.isActive) return;
+    const data = normalizeChat(message);
+    if (!data) return; // filtered by privacy settings
+    sessionRecorder.recordChat(data);
+    // Also record any embedded rolls
+    for (const roll of data.rolls) {
+      sessionRecorder.recordRoll(roll);
+    }
+    debug("Chat captured:", message.id);
   });
 
-  if (!start) return;
+  // --- Combat ---
+  Hooks.on("combatStart", (combat) => {
+    if (!sessionRecorder.isActive) return;
+    const data = normalizeCombatEvent("combat-start", combat);
+    if (data) sessionRecorder.recordCombat(data);
+  });
 
-  const sessionTitle = await promptSessionTitle();
-  if (sessionTitle === null) return;
+  Hooks.on("deleteCombat", (combat) => {
+    if (!sessionRecorder.isActive) return;
+    const data = normalizeCombatEvent("combat-end", combat);
+    if (data) sessionRecorder.recordCombat(data);
+  });
 
-  await captureManager.startCapture({ campaignId, sessionTitle });
+  Hooks.on("combatRound", (combat, _updateData, _options) => {
+    if (!sessionRecorder.isActive) return;
+    const data = normalizeCombatEvent("round-change", combat, { round: combat.round });
+    if (data) sessionRecorder.recordCombat(data);
+  });
+
+  Hooks.on("combatTurn", (combat, _updateData, _options) => {
+    if (!sessionRecorder.isActive) return;
+    const data = normalizeCombatEvent("turn-change", combat, {
+      round: combat.round,
+      turn: combat.turn,
+      activeCombatant: combat.combatant
+        ? { id: combat.combatant.id, name: combat.combatant.name }
+        : null,
+    });
+    if (data) sessionRecorder.recordCombat(data);
+  });
+
+  // --- Scenes ---
+  Hooks.on("canvasReady", (canvas) => {
+    if (!sessionRecorder.isActive) return;
+    const scene = canvas?.scene;
+    if (!scene) return;
+    const data = normalizeSceneView(scene);
+    if (data) sessionRecorder.recordScene(data);
+    debug("Scene viewed:", scene.name);
+  });
+
+  // --- Actors ---
+  Hooks.on("createActor", (actor) => {
+    if (!sessionRecorder.isActive) return;
+    if (!getSetting("captureActorSnapshots")) return;
+    const data = normalizeActorEvent("created", actor);
+    if (data) sessionRecorder.recordActor(data);
+  });
+
+  Hooks.on("updateActor", (actor) => {
+    if (!sessionRecorder.isActive) return;
+    if (!getSetting("captureActorSnapshots")) return;
+    const data = normalizeActorEvent("updated", actor);
+    if (data) sessionRecorder.recordActor(data);
+  });
+
+  Hooks.on("deleteActor", (actor) => {
+    if (!sessionRecorder.isActive) return;
+    const data = normalizeActorEvent("deleted", actor);
+    if (data) sessionRecorder.recordActor(data);
+  });
+
+  // --- Items ---
+  Hooks.on("createItem", (item) => {
+    if (!sessionRecorder.isActive) return;
+    if (!getSetting("captureItemSnapshots")) return;
+    const data = normalizeItemEvent("created", item);
+    if (data) sessionRecorder.recordItem(data);
+  });
+
+  Hooks.on("updateItem", (item) => {
+    if (!sessionRecorder.isActive) return;
+    if (!getSetting("captureItemSnapshots")) return;
+    const data = normalizeItemEvent("updated", item);
+    if (data) sessionRecorder.recordItem(data);
+  });
+
+  Hooks.on("deleteItem", (item) => {
+    if (!sessionRecorder.isActive) return;
+    const data = normalizeItemEvent("deleted", item);
+    if (data) sessionRecorder.recordItem(data);
+  });
+
+  // --- Journals ---
+  Hooks.on("renderJournalSheet", (_app, _html, data) => {
+    if (!sessionRecorder.isActive) return;
+    const journal = data?.document ?? _app?.document;
+    if (!journal) return;
+    const normalized = normalizeJournalEvent("opened", journal);
+    if (normalized) sessionRecorder.recordJournal(normalized);
+  });
+
+  Hooks.on("updateJournalEntry", (journal) => {
+    if (!sessionRecorder.isActive) return;
+    const normalized = normalizeJournalEvent("updated", journal);
+    if (normalized) sessionRecorder.recordJournal(normalized);
+  });
+
+  // --- Tokens (lightweight) ---
+  Hooks.on("createToken", (token) => {
+    if (!sessionRecorder.isActive) return;
+    debug("Token created:", token.name);
+    sessionRecorder.recordScene({
+      subtype: "token-created",
+      timestamp: new Date().toISOString(),
+      sceneId: token.parent?.id ?? token.sceneId ?? null,
+      name: token.parent?.name ?? null,
+      token: {
+        id: token.id,
+        name: token.name,
+        actorId: token.actorId,
+        x: token.x,
+        y: token.y,
+        hidden: token.hidden,
+      },
+    });
+  });
+
+  Hooks.on("deleteToken", (token) => {
+    if (!sessionRecorder.isActive) return;
+    sessionRecorder.recordScene({
+      subtype: "token-deleted",
+      timestamp: new Date().toISOString(),
+      sceneId: token.parent?.id ?? token.sceneId ?? null,
+      name: token.parent?.name ?? null,
+      token: { id: token.id, name: token.name, actorId: token.actorId },
+    });
+  });
 }
-
-Hooks.on("getSceneControlButtons", (controls) => {
-  if (!game.user?.isGM) return;
-
-  // V14: controls is an object keyed by group name; V13 and earlier: array with .find()
-  const tokenGroup = Array.isArray(controls)
-    ? controls.find((c) => c.name === "token" || c.name === "tokens")
-    : (controls.tokens ?? controls.token);
-  if (!tokenGroup?.tools) return;
-
-  const isCapturing = getSetting("isCapturing") ?? false;
-
-  const panelTool = {
-    name: "tablecodex",
-    title: "TableCodex",
-    icon: "fas fa-scroll",
-    button: true,
-    onChange: () => openTableCodexPanel(),
-  };
-
-  const sessionTool = {
-    name: "tablecodex-session",
-    title: isCapturing ? "Stop Session" : "Start Session",
-    icon: isCapturing ? "fas fa-stop" : "fas fa-circle",
-    button: true,
-    onChange: async () => {
-      if (getSetting("isCapturing")) {
-        await captureManager.stopCapture();
-      } else {
-        const sessionTitle = await promptSessionTitle();
-        if (sessionTitle === null) return;
-        const campaignId = getSetting("campaignId") || "";
-        await captureManager.startCapture({ campaignId, sessionTitle });
-      }
-    },
-  };
-
-  if (Array.isArray(tokenGroup.tools)) {
-    tokenGroup.tools.push(panelTool, sessionTool);
-  } else {
-    tokenGroup.tools.tablecodex = panelTool;
-    tokenGroup.tools["tablecodex-session"] = sessionTool;
-  }
-});
