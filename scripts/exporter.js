@@ -1,6 +1,6 @@
-import { MODULE_ID } from "./settings.js";
+import { MODULE_ID, getSetting } from "./settings.js";
 import { sessionRecorder } from "./session-recorder.js";
-import { apiClient } from "./api-client.js";
+import { apiClient, validateReadyToSync } from "./api-client.js";
 import { log } from "./logger.js";
 
 // ---------------------------------------------------------------------------
@@ -65,6 +65,7 @@ function _buildMarkdown(p) {
   lines.push(`| Session ID | ${sess.localSessionId} |`);
   if (sess.sessionTitle) lines.push(`| Title | ${sess.sessionTitle} |`);
   lines.push(`| World | ${world.name} (${world.id}) |`);
+  if (p.tablecodex?.campaignName) lines.push(`| Campaign | ${p.tablecodex.campaignName} |`);
   lines.push(`| System | ${p.systemId} |`);
   lines.push(`| Foundry Version | ${p.foundryVersion} |`);
   lines.push(`| Started | ${sess.startedAt} |`);
@@ -182,9 +183,21 @@ function _buildMarkdown(p) {
 // ---------------------------------------------------------------------------
 
 export async function syncSession() {
+  // Validate before building the payload — fail fast with a clear message.
+  const invalid = validateReadyToSync();
+  if (invalid) {
+    ui.notifications.warn(`TableCodex: ${invalid}`);
+    return { success: false, error: invalid };
+  }
+
+  if (!sessionRecorder.session) {
+    const msg = game.i18n.localize("TABLECODEX.Error.NoSession");
+    ui.notifications.warn(`TableCodex: ${msg}`);
+    return { success: false, error: msg };
+  }
+
   const payload = sessionRecorder.buildPayload();
 
-  // Warn on large payloads
   const size = JSON.stringify(payload).length;
   if (size > 5_000_000) {
     ui.notifications.warn(game.i18n.localize("TABLECODEX.Warn.LargePayload"));

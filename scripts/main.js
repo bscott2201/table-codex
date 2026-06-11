@@ -11,6 +11,9 @@ import { openPanel, refreshPanel, injectSceneControls } from "./ui.js";
 Hooks.once("init", () => {
   log(`Initializing ${MODULE_TITLE}`);
   registerSettings();
+
+  // Handlebars helper used by the campaign dropdown to mark the selected option.
+  Handlebars.registerHelper("eq", (a, b) => a === b);
 });
 
 // ---------------------------------------------------------------------------

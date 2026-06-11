@@ -56,7 +56,25 @@
       }
     },
     "Panel": {
+      "Status": "Status",
+      "Status.Campaign": "Campaign",
+      "Status.World": "World",
+      "Status.Token": "Token",
+      "Status.LastSync": "Last Sync",
+      "Status.NoCampaign": "No campaign selected",
+      "Status.NoToken": "Not configured",
+      "Status.Synced": "Synced",
+      "Status.Unsynced": "Pending sync",
+      "Campaign": "Campaign",
+      "FetchCampaigns": "Fetch Campaigns",
+      "SelectCampaign": "Select a campaign",
+      "LinkCampaign": "Link World to Campaign",
+      "CurrentCampaign": "Current campaign",
       "SessionInfo": "Session",
+      "SessionTitle": "Title",
+      "Started": "Started",
+      "Ended": "Ended",
+      "ImportId": "Import ID",
       "Captured": "Captured",
       "ChatMessages": "chat messages",
       "Rolls": "rolls",
@@ -110,14 +128,21 @@
       "ExportJsonOk": "TableCodex: JSON exported.",
       "ExportMdOk": "TableCodex: Markdown exported.",
       "SessionResumed": "TableCodex: Resumed active session from before reload.",
-      "SessionPendingExport": "TableCodex: You have an unsaved session ready to export or sync."
+      "SessionPendingExport": "TableCodex: You have an unsaved session ready to export or sync.",
+      "CampaignLinked": "TableCodex: Linked to campaign \"{name}\".",
+      "CampaignAutoSelected": "TableCodex: Campaign \"{name}\" auto-selected."
     },
     "Warn": {
-      "LargePayload": "TableCodex: Session payload is large (>5 MB). Sync may be slow."
+      "LargePayload": "TableCodex: Session payload is large (>5 MB). Sync may be slow.",
+      "NoCampaignsFound": "TableCodex: No campaigns found. Check your API URL and token.",
+      "NoCampaignSelected": "Select a campaign from the list first.",
+      "NoCampaignForSession": "No campaign selected. Select a campaign before syncing."
     },
     "Error": {
       "NoApiUrl": "TableCodex API URL is not configured.",
-      "NoApiToken": "TableCodex API token is not configured."
+      "NoApiToken": "TableCodex API token is not configured.",
+      "NoCampaign": "Select a TableCodex campaign before connecting.",
+      "NoSession": "No session data to sync."
     },
     "ExportSummary": {
       "Intro": "Your session contains:",

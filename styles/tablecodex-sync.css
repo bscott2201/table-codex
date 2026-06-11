@@ -10,6 +10,54 @@
   color: var(--color-text-primary, #f0ece3);
 }
 
+/* ── Status indicators ─────────────────────────────────────────────────── */
+.tc-status-ok {
+  color: #2ecc71;
+  font-size: 0.8rem;
+}
+
+.tc-status-warn {
+  color: #e67e22;
+  font-size: 0.8rem;
+}
+
+.tc-status-ok i,
+.tc-status-warn i {
+  margin-right: 0.2rem;
+}
+
+/* ── Campaign section ──────────────────────────────────────────────────── */
+.tc-campaign-row {
+  display: flex;
+  gap: 0.35rem;
+  margin-bottom: 0.3rem;
+}
+
+.tc-campaign-row:last-child {
+  margin-bottom: 0;
+}
+
+.tc-select {
+  flex: 1;
+  background: #1e1e1e;
+  border: 1px solid #555;
+  border-radius: 3px;
+  color: #e0dcd3;
+  padding: 0.25rem 0.4rem;
+  font-size: 0.8rem;
+}
+
+.tc-select:focus {
+  border-color: var(--color-warm-2, #c9a45c);
+  outline: none;
+}
+
+.tc-hint {
+  font-size: 0.78rem;
+  color: #999;
+  margin: 0.2rem 0 0;
+}
+
 /* ── Header ────────────────────────────────────────────────────────────── */
 .tc-header {
   display: flex;
@@ -213,6 +261,15 @@
 .tc-btn--sm {
   padding: 0.25rem 0.5rem;
   font-size: 0.75rem;
+}
+
+.tc-btn--full {
+  width: 100%;
+}
+
+.tc-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .tc-btn--test {

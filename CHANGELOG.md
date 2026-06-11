@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.2.3 — Campaign Selector
+
+- New settings: `selectedCampaignId`, `selectedCampaignName` (stored internally, not shown in config)
+- New API method: `fetchCampaigns()` — GET `/api/integrations/foundry/campaigns`
+- Campaign selector in panel: Fetch Campaigns → dropdown → Link World to Campaign
+- Auto-selects and saves if only one campaign is returned
+- `testConnection` now requires a campaign to be selected and includes `campaignId` in the connect body
+- `syncSession` validates url + token + campaign before sending; blocks with friendly message if missing
+- `buildPayload()` now includes `tablecodex: { campaignId, campaignName }` in the export JSON
+- Markdown export includes Campaign row in session metadata table
+- Panel status section shows campaign name, world, token presence, and sync state
+- Sync button disabled in template when no campaign is selected
+- Handlebars `eq` helper registered for dropdown selected-state logic
+- New i18n strings for all campaign/status UI
+
 ## 0.2.2 — Token Hardening & UI
 
 - `cleanToken()` helper strips whitespace and surrounding quotes from any raw token value

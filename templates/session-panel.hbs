@@ -1,5 +1,6 @@
 <div class="tablecodex-panel-wrap">
 
+  {{!-- Header --}}
   <header class="tc-header">
     <span class="tc-logo"><i class="fas fa-scroll"></i></span>
     <span class="tc-title">TableCodex Sync</span>
@@ -12,15 +13,89 @@
     {{/if}}
   </header>
 
+  {{!-- Status --}}
+  <section class="tc-section">
+    <h4>{{localize "TABLECODEX.Panel.Status"}}</h4>
+    <dl class="tc-dl">
+      <dt>{{localize "TABLECODEX.Panel.Status.Campaign"}}</dt>
+      <dd>
+        {{#if hasCampaign}}
+          <span class="tc-status-ok"><i class="fas fa-check-circle"></i> {{campaignName}}</span>
+        {{else}}
+          <span class="tc-status-warn"><i class="fas fa-exclamation-triangle"></i> {{localize "TABLECODEX.Panel.Status.NoCampaign"}}</span>
+        {{/if}}
+      </dd>
+
+      <dt>{{localize "TABLECODEX.Panel.Status.World"}}</dt>
+      <dd>{{worldName}}</dd>
+
+      <dt>{{localize "TABLECODEX.Panel.Status.Token"}}</dt>
+      <dd>
+        {{#if hasToken}}
+          <span class="tc-status-ok"><i class="fas fa-check-circle"></i> {{tokenHint}}</span>
+        {{else}}
+          <span class="tc-status-warn"><i class="fas fa-exclamation-triangle"></i> {{localize "TABLECODEX.Panel.Status.NoToken"}}</span>
+        {{/if}}
+      </dd>
+
+      {{#if hasSession}}
+        <dt>{{localize "TABLECODEX.Panel.Status.LastSync"}}</dt>
+        <dd>
+          {{#if synced}}
+            <span class="tc-status-ok"><i class="fas fa-cloud-check"></i> {{localize "TABLECODEX.Panel.Status.Synced"}}</span>
+          {{else}}
+            <span class="tc-status-warn">{{localize "TABLECODEX.Panel.Status.Unsynced"}}</span>
+          {{/if}}
+        </dd>
+      {{/if}}
+    </dl>
+  </section>
+
+  {{!-- Campaign selector --}}
+  <section class="tc-section">
+    <h4>{{localize "TABLECODEX.Panel.Campaign"}}</h4>
+
+    <div class="tc-campaign-row">
+      <button data-action="fetch-campaigns" class="tc-btn tc-btn--accent tc-btn--sm">
+        <i class="fas fa-sync-alt"></i> {{localize "TABLECODEX.Panel.FetchCampaigns"}}
+      </button>
+    </div>
+
+    {{#if hasFetchedCampaigns}}
+    <div class="tc-campaign-row">
+      <select data-campaign-select class="tc-select">
+        <option value="">— {{localize "TABLECODEX.Panel.SelectCampaign"}} —</option>
+        {{#each campaigns}}
+          <option value="{{id}}" {{#if (eq id ../campaignId)}}selected{{/if}}>
+            {{name}}{{#if system}} ({{system}}){{/if}}
+          </option>
+        {{/each}}
+      </select>
+    </div>
+    <div class="tc-campaign-row">
+      <button data-action="save-campaign" class="tc-btn tc-btn--primary tc-btn--sm tc-btn--full">
+        <i class="fas fa-link"></i> {{localize "TABLECODEX.Panel.LinkCampaign"}}
+      </button>
+    </div>
+    {{/if}}
+
+    {{#unless hasFetchedCampaigns}}
+    {{#if hasCampaign}}
+    <p class="tc-hint">{{localize "TABLECODEX.Panel.CurrentCampaign"}}: <strong>{{campaignName}}</strong></p>
+    {{/if}}
+    {{/unless}}
+  </section>
+
+  {{!-- Session info --}}
   {{#if hasSession}}
   <section class="tc-section">
     <h4>{{localize "TABLECODEX.Panel.SessionInfo"}}</h4>
     <dl class="tc-dl">
-      {{#if sessionTitle}}<dt>Title</dt><dd>{{sessionTitle}}</dd>{{/if}}
+      {{#if sessionTitle}}<dt>{{localize "TABLECODEX.Panel.SessionTitle"}}</dt><dd>{{sessionTitle}}</dd>{{/if}}
       <dt>ID</dt><dd class="tc-mono">{{localSessionId}}</dd>
-      <dt>Started</dt><dd>{{startedAt}}</dd>
-      {{#unless isActive}}<dt>Ended</dt><dd>{{endedAt}}</dd>{{/unless}}
-      {{#if synced}}<dt>Import ID</dt><dd class="tc-mono">{{remoteImportId}}</dd>{{/if}}
+      <dt>{{localize "TABLECODEX.Panel.Started"}}</dt><dd>{{startedAt}}</dd>
+      {{#unless isActive}}<dt>{{localize "TABLECODEX.Panel.Ended"}}</dt><dd>{{endedAt}}</dd>{{/unless}}
+      {{#if synced}}<dt>{{localize "TABLECODEX.Panel.ImportId"}}</dt><dd class="tc-mono">{{remoteImportId}}</dd>{{/if}}
     </dl>
   </section>
 
@@ -37,6 +112,7 @@
   </section>
   {{/if}}
 
+  {{!-- Session actions --}}
   <section class="tc-section tc-actions">
     {{#if isActive}}
       <button data-action="end-session" class="tc-btn tc-btn--danger">
@@ -58,7 +134,9 @@
       </button>
     </div>
     <div class="tc-action-row">
-      <button data-action="sync-session" class="tc-btn tc-btn--accent" {{#if synced}}title="Already synced — will re-sync"{{/if}}>
+      <button data-action="sync-session" class="tc-btn tc-btn--accent"
+        {{#unless hasCampaign}}disabled title="{{localize "TABLECODEX.Warn.NoCampaignForSession"}}"{{/unless}}
+        {{#if synced}}title="Already synced — will re-sync"{{/if}}>
         <i class="fas fa-cloud-upload-alt"></i>
         {{#if synced}}{{localize "TABLECODEX.Panel.ReSync"}}{{else}}{{localize "TABLECODEX.Panel.Sync"}}{{/if}}
       </button>
@@ -69,6 +147,7 @@
     {{/if}}
   </section>
 
+  {{!-- Footer --}}
   <footer class="tc-footer">
     <button data-action="test-connection" class="tc-btn tc-btn--sm tc-btn--test">
       <i class="fas fa-plug"></i> {{localize "TABLECODEX.Panel.TestConnection"}}

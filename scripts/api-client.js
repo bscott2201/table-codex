@@ -6,8 +6,6 @@ import { log, debug } from "./logger.js";
 // ---------------------------------------------------------------------------
 
 export function normalizeBaseUrl(url) {
-  // Strip trailing slashes, then strip a trailing /api segment so callers
-  // that enter either "https://host" or "https://host/api" both work.
   return (url ?? "").trim().replace(/\/+$/, "").replace(/\/api$/, "");
 }
 
@@ -22,7 +20,6 @@ export function buildApiUrl(path) {
 // ---------------------------------------------------------------------------
 
 function _token() {
-  // Always clean on read — catches any value stored before the onChange normalizer existed.
   const t = cleanToken(getSetting("apiToken"));
   if (!t) throw new Error(game.i18n.localize("TABLECODEX.Error.NoApiToken"));
   debug(`Token loaded — length: ${t.length}, starts with: ${t.slice(0, 4)}...`);
@@ -36,7 +33,28 @@ function _headers() {
   };
 }
 
-// Structured error thrown for non-2xx responses; carries the HTTP status.
+// Validates that url, token, and campaign are all present. Returns an error
+// message string, or null if everything is ready.
+export function validateReadyToConnect() {
+  if (!(getSetting("tablecodexApiUrl") ?? "").trim()) {
+    return game.i18n.localize("TABLECODEX.Error.NoApiUrl");
+  }
+  if (!cleanToken(getSetting("apiToken"))) {
+    return game.i18n.localize("TABLECODEX.Error.NoApiToken");
+  }
+  if (!(getSetting("selectedCampaignId") ?? "").trim()) {
+    return game.i18n.localize("TABLECODEX.Error.NoCampaign");
+  }
+  return null;
+}
+
+export function validateReadyToSync() {
+  const base = validateReadyToConnect();
+  if (base) return base;
+  return null;
+}
+
+// Structured error that carries the HTTP status through the catch boundary.
 class ApiError extends Error {
   constructor(status, message) {
     super(message);
@@ -62,7 +80,6 @@ async function _request(method, path, body) {
   }
 
   if (!res.ok) {
-    // Try to extract a message from the response body.
     let bodyMsg = null;
     let bodyText = null;
     try {
@@ -109,18 +126,43 @@ function _connectionErrorMessage(err) {
 // ---------------------------------------------------------------------------
 
 export const apiClient = {
+  async fetchCampaigns() {
+    try {
+      const result = await _request("GET", "/integrations/foundry/campaigns");
+      const campaigns = result?.campaigns ?? [];
+      log(`Fetched ${campaigns.length} campaign(s).`);
+      debug("Campaigns:", campaigns.map((c) => `${c.name} (${c.id})`).join(", "));
+      return { success: true, campaigns };
+    } catch (err) {
+      const userMsg = _connectionErrorMessage(err);
+      ui.notifications.error(`TableCodex: ${userMsg}`);
+      log(`fetchCampaigns failed — ${err.status ? `HTTP ${err.status} — ` : ""}${err.message}`);
+      return { success: false, campaigns: [], error: err.message };
+    }
+  },
+
   async testConnection() {
+    const invalid = validateReadyToConnect();
+    if (invalid) {
+      ui.notifications.warn(`TableCodex: ${invalid}`);
+      return { success: false, error: invalid };
+    }
+
+    const campaignId   = getSetting("selectedCampaignId")   ?? "";
+    const campaignName = getSetting("selectedCampaignName")  ?? "";
+
     const connectBody = {
+      campaignId,
       foundryWorldId:   game.world?.id    ?? "",
       foundryWorldName: game.world?.title ?? "",
       systemId:         game.system?.id   ?? "",
       foundryVersion:   game.version      ?? "14",
-      moduleVersion:    game.modules.get(MODULE_ID)?.version ?? "0.2.2",
+      moduleVersion:    game.modules.get(MODULE_ID)?.version ?? "0.2.3",
     };
 
-    // Log body before the request (token is not part of the body).
     debug("testConnection — url:", buildApiUrl("/integrations/foundry/connect"));
-    debug("testConnection — body:", JSON.stringify(connectBody));
+    debug("testConnection — body:", JSON.stringify({ ...connectBody }));
+    debug(`testConnection — campaignId: ${campaignId}, campaignName: ${campaignName}`);
 
     try {
       const result = await _request("POST", "/integrations/foundry/connect", connectBody);
@@ -136,6 +178,12 @@ export const apiClient = {
   },
 
   async syncSession(payload) {
+    const invalid = validateReadyToSync();
+    if (invalid) {
+      ui.notifications.warn(`TableCodex: ${invalid}`);
+      return { success: false, error: invalid };
+    }
+
     try {
       const result = await _request("POST", "/integrations/foundry/session-import", payload);
       const importId = result?.importId ?? result?.id ?? null;

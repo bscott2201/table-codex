@@ -1,7 +1,7 @@
 export const MODULE_ID = "tablecodex-sync";
 export const MODULE_TITLE = "TableCodex Sync";
 export const SCHEMA_VERSION = "1.0.0";
-export const MODULE_VERSION = "0.2.2";
+export const MODULE_VERSION = "0.2.3";
 
 export function registerSettings() {
   const S = game.settings;
@@ -141,6 +141,20 @@ export function registerSettings() {
   });
 
   S.register(m, "lastSyncedImportId", {
+    scope: "world",
+    config: false,
+    type: String,
+    default: "",
+  });
+
+  S.register(m, "selectedCampaignId", {
+    scope: "world",
+    config: false,
+    type: String,
+    default: "",
+  });
+
+  S.register(m, "selectedCampaignName", {
     scope: "world",
     config: false,
     type: String,

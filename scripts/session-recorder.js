@@ -166,18 +166,21 @@ export const sessionRecorder = {
   buildPayload() {
     const privacy = getPrivacySettings();
     const sess = _session ?? {};
-    const world = game.world;
 
     return {
       schemaVersion: "1.0.0",
       source: "foundry_vtt",
       moduleId: MODULE_ID,
-      moduleVersion: game.modules.get(MODULE_ID)?.version ?? "0.1.0",
+      moduleVersion: game.modules.get(MODULE_ID)?.version ?? "0.2.3",
       foundryVersion: game.version ?? "14",
       systemId: game.system?.id ?? "",
       world: {
         id: game.world?.id ?? getSetting("foundryWorldId"),
         name: game.world?.title ?? getSetting("foundryWorldName"),
+      },
+      tablecodex: {
+        campaignId:   getSetting("selectedCampaignId")   ?? "",
+        campaignName: getSetting("selectedCampaignName") ?? "",
       },
       session: {
         localSessionId: sess.localSessionId ?? "",
