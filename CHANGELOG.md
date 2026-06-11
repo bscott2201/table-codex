@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.1 — Connection Debugging
+
+- Fixed connect body field names to match API (`foundryWorldId`, `foundryWorldName`, `systemId`)
+- 401 response now shows: "Missing or invalid TableCodex API token."
+- 403 response now shows: "TableCodex rejected the token. Regenerate the Foundry token in TableCodex and paste it here."
+- Debug mode logs final URL, HTTP status, response body, auth header presence, and world id/name on failure (token value never logged)
+- Removed unnecessary custom `X-` headers that could trigger CORS preflight failures
+- `ApiError` class carries HTTP status through catch boundary for status-specific messaging
+
 ## 0.2.0 — Full Rebuild
 
 - New module ID: `tablecodex-sync` (was `tablecodex-foundry`)
