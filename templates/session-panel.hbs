@@ -154,6 +154,19 @@
     {{/if}}
   </section>
 
+  {{!-- Unsynced sessions notice --}}
+  {{#if pendingSessionCount}}
+  <section class="tc-section tc-unsynced-notice">
+    <span class="tc-unsynced-badge">
+      <i class="fas fa-exclamation-triangle"></i>
+      {{pendingSessionCount}} unsynced session{{#if (gt pendingSessionCount 1)}}s{{/if}}
+    </span>
+    <button data-action="review-unsynced" class="tc-btn tc-btn--sm tc-btn--warn">
+      <i class="fas fa-history"></i> Review
+    </button>
+  </section>
+  {{/if}}
+
   {{!-- Footer --}}
   <footer class="tc-footer">
     <button data-action="open-settings" class="tc-btn tc-btn--sm tc-btn--settings">

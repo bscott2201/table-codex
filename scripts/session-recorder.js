@@ -1,6 +1,7 @@
 import { MODULE_ID, getSetting, setSetting, getPrivacySettings } from "./settings.js";
 import { log, debug } from "./logger.js";
 import { getWorldInfo } from "./world-info.js";
+import { saveUnsyncedSession } from "./session-store.js";
 
 // In-memory session state. Also persisted to world settings for reload recovery.
 let _session = null;
@@ -70,11 +71,15 @@ export const sessionRecorder = {
     }
 
     _captureClosingSnapshots();
-    _session.active = false;
+    _session.active  = false;
     _session.endedAt = new Date().toISOString();
 
     await _persist();
     log(`Session ended: ${_session.localSessionId}`);
+
+    // Snapshot everything into the unsynced store so retry is possible after reload.
+    _persistToStore();
+
     Hooks.callAll(`${MODULE_ID}.sessionStopped`, _session);
     ui.notifications.info(game.i18n.localize("TABLECODEX.Session.Ended"));
     return true;
@@ -266,6 +271,36 @@ async function _persist() {
     scenes: _scenes,
     journals: _journals,
   });
+}
+
+function _persistToStore() {
+  // Build and save the record asynchronously — errors are non-fatal.
+  try {
+    const wi             = getWorldInfo();
+    const normalizedPayload = sessionRecorder.buildPayload();
+    const payloadSizeKb  = Math.round(JSON.stringify(normalizedPayload).length / 1024);
+
+    saveUnsyncedSession({
+      localSessionId:   _session.localSessionId,
+      sessionTitle:     _session.sessionTitle ?? "",
+      startedAt:        _session.startedAt,
+      endedAt:          _session.endedAt,
+      foundryWorldId:   wi.foundryWorldId,
+      foundryWorldName: wi.foundryWorldName,
+      campaignId:       getSetting("selectedCampaignId")   ?? "",
+      campaignName:     getSetting("selectedCampaignName") ?? "",
+      summary:          sessionRecorder.stats,
+      status:           "unsynced",
+      lastSyncAttemptAt: null,
+      lastSyncError:    null,
+      attemptCount:     0,
+      remoteImportId:   null,
+      payloadSizeKb,
+      normalizedPayload,
+    }).catch((err) => log("Warning: failed to save unsynced session to store:", err.message));
+  } catch (err) {
+    log("Warning: _persistToStore threw:", err.message);
+  }
 }
 
 function _captureOpeningSnapshots() {

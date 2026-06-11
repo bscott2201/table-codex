@@ -1,0 +1,87 @@
+<div class="tc-unsynced-wrap">
+
+  {{#unless hasCampaign}}
+  <div class="tc-alert tc-alert--warn">
+    <i class="fas fa-exclamation-triangle"></i>
+    No campaign selected. Select a campaign in the TableCodex panel to enable Retry/Force Sync.
+    You can still export sessions as JSON or Markdown.
+  </div>
+  {{/unless}}
+
+  {{#if hasSessions}}
+    {{#each sessions}}
+    <div class="tc-session-card" data-session-id="{{localSessionId}}">
+
+      <div class="tc-session-card-header">
+        <span class="tc-session-card-title">{{displayTitle}}</span>
+        <span class="tc-badge tc-badge--{{status}}">{{status}}</span>
+      </div>
+
+      <dl class="tc-dl">
+        <dt>Campaign</dt>
+        <dd>{{#if campaignName}}{{campaignName}}{{else}}<span class="tc-status-warn">Not set</span>{{/if}}</dd>
+
+        <dt>World</dt>
+        <dd>{{foundryWorldName}}</dd>
+
+        <dt>Started</dt>
+        <dd>{{startedAtFmt}}</dd>
+
+        <dt>Ended</dt>
+        <dd>{{endedAtFmt}}</dd>
+
+        <dt>Events</dt>
+        <dd>{{summary.eventCount}} total &bull; {{summary.chatMessageCount}} chat &bull; {{summary.rollCount}} rolls</dd>
+
+        {{#if attemptCount}}
+        <dt>Attempts</dt>
+        <dd>{{attemptCount}} — last: {{lastAttemptFmt}}</dd>
+        {{/if}}
+
+        {{#if lastSyncError}}
+        <dt>Last error</dt>
+        <dd class="tc-session-error">{{lastSyncError}}</dd>
+        {{/if}}
+
+        {{#if payloadSizeKb}}
+        <dt>Payload</dt>
+        <dd>{{payloadSizeKb}} KB stored</dd>
+        {{/if}}
+      </dl>
+
+      <div class="tc-card-actions">
+        <button data-action="retry-sync" data-session-id="{{localSessionId}}"
+          class="tc-btn tc-btn--accent tc-btn--sm"
+          {{#unless canSync}}disabled title="Configure API URL, token, and campaign first"{{/unless}}>
+          <i class="fas fa-redo"></i> Retry Sync
+        </button>
+        <button data-action="force-sync" data-session-id="{{localSessionId}}"
+          class="tc-btn tc-btn--primary tc-btn--sm"
+          {{#unless canSync}}disabled title="Configure API URL, token, and campaign first"{{/unless}}>
+          <i class="fas fa-bolt"></i> Force Sync
+        </button>
+        <button data-action="export-json" data-session-id="{{localSessionId}}"
+          class="tc-btn tc-btn--sm">
+          <i class="fas fa-file-code"></i> JSON
+        </button>
+        <button data-action="export-md" data-session-id="{{localSessionId}}"
+          class="tc-btn tc-btn--sm">
+          <i class="fas fa-file-alt"></i> Markdown
+        </button>
+        <button data-action="archive" data-session-id="{{localSessionId}}"
+          class="tc-btn tc-btn--muted tc-btn--sm">
+          <i class="fas fa-archive"></i> Archive
+        </button>
+      </div>
+
+    </div>
+    {{/each}}
+
+  {{else}}
+    <div class="tc-empty">
+      <i class="fas fa-check-circle"></i>
+      No unsynced sessions. All caught up!
+    </div>
+  {{/if}}
+
+</div>

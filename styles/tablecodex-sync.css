@@ -298,6 +298,17 @@
   border-color: #f0b840;
 }
 
+.tc-btn--warn {
+  background: #5e3a00;
+  border-color: #e67e22;
+  color: #fff;
+}
+
+.tc-btn--warn:hover {
+  background: #7a4d00;
+  border-color: #f39c12;
+}
+
 /* ── Footer ────────────────────────────────────────────────────────────── */
 .tc-footer {
   display: flex;
@@ -305,3 +316,109 @@
   justify-content: flex-end;
   padding-top: 0.2rem;
 }
+
+/* ── Unsynced notice in main panel ────────────────────────────────────── */
+.tc-unsynced-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #3a2800;
+  border: 1px solid #e67e22;
+  border-radius: 3px;
+  padding: 0.35rem 0.5rem !important;
+}
+
+.tc-unsynced-badge {
+  font-size: 0.8rem;
+  color: #f39c12;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* ── Unsynced sessions dialog ──────────────────────────────────────────── */
+.tc-unsynced-wrap {
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.tc-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  padding: 0.4rem 0.5rem;
+  border-radius: 3px;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.tc-alert--warn {
+  background: #3a2800;
+  border: 1px solid #e67e22;
+  color: #f0c060;
+}
+
+.tc-session-card {
+  background: #1e1e1e;
+  border: 1px solid #444;
+  border-radius: 4px;
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.tc-session-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.tc-session-card-title {
+  font-weight: 700;
+  font-size: 0.85rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.tc-session-error {
+  color: #e74c3c;
+  font-size: 0.75rem;
+  word-break: break-word;
+}
+
+.tc-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  padding-top: 0.25rem;
+  border-top: 1px solid #333;
+}
+
+.tc-empty {
+  text-align: center;
+  color: #7f8c8d;
+  padding: 1.5rem 0;
+  font-size: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.tc-empty i {
+  font-size: 1.5rem;
+  color: #2ecc71;
+}
+
+/* Status badge variants for session cards */
+.tc-badge--unsynced     { background: #4a4a00; color: #f1c40f; border: 1px solid #f1c40f; }
+.tc-badge--sync_failed  { background: #4a0000; color: #e74c3c; border: 1px solid #e74c3c; }
+.tc-badge--sync_pending { background: #002244; color: #3498db; border: 1px solid #3498db; }
+.tc-badge--synced       { background: #004400; color: #2ecc71; border: 1px solid #2ecc71; }
+.tc-badge--archived     { background: #2a2a2a; color: #7f8c8d; border: 1px solid #555; }

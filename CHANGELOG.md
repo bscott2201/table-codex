@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.3.0 — Unsynced Session Recovery
+
+**New file: `scripts/session-store.js`** — persistent CRUD store for unsynced session records. Each record contains display metadata + the full `normalizedPayload` so retry/force-sync works after a Foundry reload.
+
+**New setting: `unsyncedSessions`** — world-scoped array persisted by the store.
+
+**Session end integration** — `sessionRecorder.stop()` now calls `_persistToStore()` which snapshots the full `buildPayload()` output into the store with `status: "unsynced"`. Every ended session is recoverable.
+
+**`syncSession()` integration** — marks the session pending before the POST, synced on success, failed (with error text) on failure. Failed sessions stay in the store and retain their payload for retry.
+
+**New `exporter.js` functions:**
+- `retrySyncSession(id)` — uses stored `normalizedPayload` verbatim; falls through to force sync if payload is absent
+- `forceSyncSession(id)` — always rebuilds the envelope, injecting current `campaignId` + `getWorldInfo()` over any missing/stale fields in the stored record
+- `exportUnsyncedJson(id)` / `exportUnsyncedMarkdown(id)` — download exports from stored sessions without needing an API connection
+
+**New `UnsyncedSessionsDialog`** — full Application showing all pending sessions (unsynced, sync_failed, sync_pending). Each card shows: title, campaign, world, dates, event/chat/roll counts, attempt count, last error, payload size. Actions: Retry Sync, Force Sync, Export JSON, Export Markdown, Archive.
+
+**Panel notice** — "X unsynced sessions" warning with "Review" button appears when pending sessions exist.
+
+**Load-time warning** — on `ready`, GM sees a Foundry notification with the count of pending sessions and guidance to open the panel.
+
+**Handlebars helpers** — added `gt` alongside existing `eq` for `{{#if (gt count 1)}}` pluralization.
+
 ## 0.2.6 — Payload Shape Fix
 
 **Root fix:** `session-import` and JSON export now include `foundryWorldId` / `foundryWorldName` / `localSessionId` / `startedAt` as top-level fields, which the server and web upload validator require.

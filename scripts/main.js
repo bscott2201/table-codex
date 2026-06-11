@@ -2,7 +2,8 @@ import { MODULE_ID, MODULE_TITLE, registerSettings, getSetting, setSetting } fro
 import { log, debug } from "./logger.js";
 import { sessionRecorder } from "./session-recorder.js";
 import { normalizeChat, normalizeCombatEvent, normalizeSceneView, normalizeActorEvent, normalizeItemEvent, normalizeJournalEvent } from "./event-normalizer.js";
-import { openPanel, refreshPanel, injectSceneControls } from "./ui.js";
+import { openPanel, refreshPanel, injectSceneControls, openUnsyncedDialog } from "./ui.js";
+import { getPendingSessions } from "./session-store.js";
 
 // ---------------------------------------------------------------------------
 // Init
@@ -12,8 +13,8 @@ Hooks.once("init", () => {
   log(`Initializing ${MODULE_TITLE}`);
   registerSettings();
 
-  // Handlebars helper used by the campaign dropdown to mark the selected option.
   Handlebars.registerHelper("eq", (a, b) => a === b);
+  Handlebars.registerHelper("gt", (a, b) => a > b);
 });
 
 // ---------------------------------------------------------------------------
@@ -43,7 +44,21 @@ Hooks.once("ready", async () => {
   // Subscribe to session events to keep UI in sync
   Hooks.on(`${MODULE_ID}.sessionStarted`, refreshPanel);
   Hooks.on(`${MODULE_ID}.sessionStopped`, refreshPanel);
-  Hooks.on(`${MODULE_ID}.bufferCleared`, refreshPanel);
+  Hooks.on(`${MODULE_ID}.bufferCleared`,  refreshPanel);
+
+  // Warn GM about any sessions that need attention
+  if (game.user?.isGM) {
+    const pending = getPendingSessions();
+    debug(`Unsynced session store: ${pending.length} pending session(s).`);
+    if (pending.length > 0) {
+      const label = pending.length === 1 ? "session" : "sessions";
+      // Show as a persistent warning with a clickable action
+      ui.notifications.warn(
+        `TableCodex: You have ${pending.length} unsynced ${label}. ` +
+        `Open the TableCodex panel and click "Review Unsynced Sessions" to retry or export.`
+      );
+    }
+  }
 
   _registerCaptureHooks();
 });
