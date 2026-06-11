@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.2.6 — Payload Shape Fix
+
+**Root fix:** `session-import` and JSON export now include `foundryWorldId` / `foundryWorldName` / `localSessionId` / `startedAt` as top-level fields, which the server and web upload validator require.
+
+**New `scripts/world-info.js`** — `getWorldInfo()` returns `{ foundryWorldId, foundryWorldName, foundryVersion, systemId, moduleVersion }` with a full defensive fallback chain:
+- `game.world.id` → `game.world._id` → `game.world.title` → stored setting → `"unknown-world"`
+- Falls back to stored setting before using the sentinel value
+- Logs a warning if any fallback is used
+
+**`buildPayload()` in session-recorder** — now includes flat top-level fields (`foundryWorldId`, `foundryWorldName`, `campaignId`, `campaignName`, `localSessionId`, `startedAt`, `endedAt`) alongside the existing nested `world`/`tablecodex`/`session` objects. Both exist for backwards compatibility.
+
+**`syncSession()` in exporter** — builds a proper envelope for `POST /session-import`:
+```
+{ campaignId, foundryWorldId, foundryWorldName, foundryVersion, systemId, moduleVersion,
+  localSessionId, startedAt, endedAt, source: "api_sync", payload: <normalized> }
+```
+Validates all required fields before the request; logs a summary in debug mode.
+
+**`exportJson()`** — validates required fields before writing the file; logs export metadata in debug mode; blocks with a clear notification if `foundryWorldId` or `localSessionId` is missing.
+
+**`linkWorld()`** — uses `getWorldInfo()` consistently; no more duplicated world extraction logic.
+
 ## 0.2.5 — Ping/Connect Hardening
 
 - `pingApi` 404 → new `"unavailable"` state; shows advisory "Ping endpoint not available yet. Try Fetch Campaigns to verify token access." and still auto-fetches campaigns (token may be valid even if ping route isn't deployed)

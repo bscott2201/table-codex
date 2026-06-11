@@ -1,5 +1,6 @@
-import { MODULE_ID, MODULE_VERSION, getSetting, setSetting, cleanToken } from "./settings.js";
+import { MODULE_ID, getSetting, setSetting, cleanToken } from "./settings.js";
 import { log, debug } from "./logger.js";
+import { getWorldInfo } from "./world-info.js";
 
 // ---------------------------------------------------------------------------
 // URL helpers
@@ -192,7 +193,6 @@ export const apiClient = {
 
   // Step 3 — confirm campaign + world pairing. Requires a selected campaign.
   async linkWorld() {
-    // Validate campaign
     const campaignId = _safeCampaignId();
     if (!campaignId) {
       const msg = "Select a TableCodex campaign before linking this world.";
@@ -200,16 +200,14 @@ export const apiClient = {
       return { success: false, error: msg };
     }
 
-    // Validate world fields — backend 400s if these are missing
-    const foundryWorldId   = (game.world?.id    ?? "").trim();
-    const foundryWorldName = (game.world?.title ?? game.world?.id ?? "").trim();
-    const systemId         = (game.system?.id   ?? "").trim();
-    const foundryVersion   = (game.version      ?? "14").trim();
+    const wi = getWorldInfo();
+    const campaignName = getSetting("selectedCampaignName") ?? "";
 
+    // Pre-flight: surface any missing world fields before hitting the server
     const missingLocally = [];
-    if (!foundryWorldId)   missingLocally.push("foundryWorldId");
-    if (!foundryWorldName) missingLocally.push("foundryWorldName");
-    if (!systemId)         missingLocally.push("systemId");
+    if (!wi.foundryWorldId || wi.foundryWorldId === "unknown-world") missingLocally.push("foundryWorldId");
+    if (!wi.foundryWorldName || wi.foundryWorldName === "Unknown World") missingLocally.push("foundryWorldName");
+    if (!wi.systemId || wi.systemId === "unknown") missingLocally.push("systemId");
 
     if (missingLocally.length > 0) {
       const msg = `Cannot link world — missing: ${missingLocally.join(", ")}. Is the world fully loaded?`;
@@ -218,23 +216,20 @@ export const apiClient = {
       return { success: false, error: msg };
     }
 
-    const campaignName = getSetting("selectedCampaignName") ?? "";
-    const resolvedVersion = game.modules.get(MODULE_ID)?.version ?? MODULE_VERSION;
-
     const body = {
       campaignId,
-      foundryWorldId,
-      foundryWorldName,
-      systemId,
-      foundryVersion,
-      moduleVersion: resolvedVersion,
+      foundryWorldId:   wi.foundryWorldId,
+      foundryWorldName: wi.foundryWorldName,
+      systemId:         wi.systemId,
+      foundryVersion:   wi.foundryVersion,
+      moduleVersion:    wi.moduleVersion,
     };
 
     debug("linkWorld — url:", buildApiUrl("/integrations/foundry/connect"));
     debug("linkWorld — body:", JSON.stringify(body));
     debug(`linkWorld — campaignId: ${campaignId}, campaignName: ${campaignName}`);
-    debug(`linkWorld — foundryWorldId: ${foundryWorldId}, foundryWorldName: ${foundryWorldName}`);
-    debug(`linkWorld — systemId: ${systemId}, foundryVersion: ${foundryVersion}, moduleVersion: ${resolvedVersion}`);
+    debug(`linkWorld — foundryWorldId: ${wi.foundryWorldId}, foundryWorldName: ${wi.foundryWorldName}`);
+    debug(`linkWorld — systemId: ${wi.systemId}, foundryVersion: ${wi.foundryVersion}, moduleVersion: ${wi.moduleVersion}`);
 
     try {
       const result = await _request("POST", "/integrations/foundry/connect", body);
@@ -247,22 +242,19 @@ export const apiClient = {
     } catch (err) {
       await setSetting("worldLinked", false);
 
-      // Log every body field to help debug 400s — never log the token
       log("linkWorld failed —",
         `HTTP ${err.status ?? "?"} |`,
         `campaignId: ${campaignId} |`,
-        `foundryWorldId: ${foundryWorldId} |`,
-        `foundryWorldName: ${foundryWorldName} |`,
-        `systemId: ${systemId} |`,
-        `foundryVersion: ${foundryVersion} |`,
-        `moduleVersion: ${resolvedVersion} |`,
+        `foundryWorldId: ${wi.foundryWorldId} |`,
+        `foundryWorldName: ${wi.foundryWorldName} |`,
+        `systemId: ${wi.systemId} |`,
+        `foundryVersion: ${wi.foundryVersion} |`,
+        `moduleVersion: ${wi.moduleVersion} |`,
         `error: ${err.message}`
       );
 
-      // Surface missingFields from the server response if present
       if (err instanceof ApiError && err.status === 400 && err.missingFields?.length) {
-        const fieldList = err.missingFields.join(", ");
-        const msg = `Missing required fields: ${fieldList}`;
+        const msg = `Missing required fields: ${err.missingFields.join(", ")}`;
         ui.notifications.error(`TableCodex: ${msg}`);
         return { success: false, error: msg, status: 400 };
       }

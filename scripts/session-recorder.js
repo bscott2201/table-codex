@@ -1,5 +1,6 @@
 import { MODULE_ID, getSetting, setSetting, getPrivacySettings } from "./settings.js";
 import { log, debug } from "./logger.js";
+import { getWorldInfo } from "./world-info.js";
 
 // In-memory session state. Also persisted to world settings for reload recovery.
 let _session = null;
@@ -164,44 +165,61 @@ export const sessionRecorder = {
   },
 
   buildPayload() {
-    const privacy = getPrivacySettings();
-    const sess = _session ?? {};
+    const privacy  = getPrivacySettings();
+    const sess     = _session ?? {};
+    const wi       = getWorldInfo();
+    const campaignId   = getSetting("selectedCampaignId")   ?? "";
+    const campaignName = getSetting("selectedCampaignName") ?? "";
 
     return {
+      // Schema / source identifiers
       schemaVersion: "1.0.0",
-      source: "foundry_vtt",
-      moduleId: MODULE_ID,
-      moduleVersion: game.modules.get(MODULE_ID)?.version ?? "0.2.3",
-      foundryVersion: game.version ?? "14",
-      systemId: game.system?.id ?? "",
+      source:        "foundry_vtt",
+      moduleId:      MODULE_ID,
+      moduleVersion: wi.moduleVersion,
+
+      // Flat top-level fields required by the web app upload validator
+      foundryWorldId:   wi.foundryWorldId,
+      foundryWorldName: wi.foundryWorldName,
+      foundryVersion:   wi.foundryVersion,
+      systemId:         wi.systemId,
+      campaignId,
+      campaignName,
+      localSessionId: sess.localSessionId ?? "",
+      startedAt:      sess.startedAt      ?? "",
+      endedAt:        sess.endedAt        ?? "",
+
+      // Nested world object (kept for backwards compat / human readability)
       world: {
-        id: game.world?.id ?? getSetting("foundryWorldId"),
-        name: game.world?.title ?? getSetting("foundryWorldName"),
+        id:   wi.foundryWorldId,
+        name: wi.foundryWorldName,
       },
-      tablecodex: {
-        campaignId:   getSetting("selectedCampaignId")   ?? "",
-        campaignName: getSetting("selectedCampaignName") ?? "",
-      },
+
+      // TableCodex-specific metadata
+      tablecodex: { campaignId, campaignName },
+
+      // Session envelope
       session: {
         localSessionId: sess.localSessionId ?? "",
-        sessionTitle: sess.sessionTitle ?? "",
-        startedAt: sess.startedAt ?? "",
-        endedAt: sess.endedAt ?? "",
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        active: sess.active ?? false,
-        synced: sess.synced ?? false,
+        sessionTitle:   sess.sessionTitle   ?? "",
+        startedAt:      sess.startedAt      ?? "",
+        endedAt:        sess.endedAt        ?? "",
+        timezone:       Intl.DateTimeFormat().resolvedOptions().timeZone,
+        active:         sess.active         ?? false,
+        synced:         sess.synced         ?? false,
         remoteImportId: sess.remoteImportId ?? null,
       },
+
       settings: privacy,
-      summary: this.stats,
-      events: _events,
+      summary:  this.stats,
+      events:       _events,
       chatMessages: _chatMessages,
-      rolls: _rolls,
-      combats: _combats,
-      actors: _actors,
-      items: _items,
-      scenes: _scenes,
-      journals: _journals,
+      rolls:        _rolls,
+      combats:      _combats,
+      actors:       _actors,
+      items:        _items,
+      scenes:       _scenes,
+      journals:     _journals,
     };
   },
 
