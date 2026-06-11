@@ -48,6 +48,17 @@
       "DebugLogging": {
         "Name": "Debug Logging",
         "Hint": "Log verbose capture events to the browser console."
+      },
+      "CaptureMode": {
+        "Name": "Capture Mode",
+        "Hint": "Controls what gets captured during a session. Standard is recommended for normal play.",
+        "Minimal": "Minimal — chat, rolls, combat, referenced entities only",
+        "Standard": "Standard (Recommended) — includes actor/item updates during session",
+        "FullSnapshot": "Full Snapshot — full world snapshot at session start/end (debug/recovery only, creates large exports)"
+      },
+      "IncludeRawHtml": {
+        "Name": "Include Raw HTML in Chat",
+        "Hint": "Include full HTML content in exported chat messages. Disable to reduce payload size."
       }
     },
     "Controls": {

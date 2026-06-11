@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.4.0 — Capture Modes & Payload Sanitization
+
+**New setting: `captureMode`** — `minimal` / `standard` (default) / `full_snapshot`
+
+**`standard` mode (new default):** Captures chat, rolls, combat events, scene views, actor/item update events during the session, and minimal snapshots of actors/items that appear in chat or rolls. Does NOT dump the full world actor/item/scene list at session start/end. A 664-actor world now produces 0 session-open snapshots; only actors that actually participated in the session are included.
+
+**`full_snapshot` mode:** Preserves old behavior — full world snapshots at session-open and session-close. Use for debug/recovery. Exports may be large and noisy.
+
+**`minimal` mode:** Chat, rolls, combat, scene views, and referenced entities only. No actor/item update events.
+
+**Reference tracking:** `_referencedActorIds`, `_referencedItemIds`, `_referencedSceneIds` sets track entities encountered during the session via chat speaker, roll speaker, item card HTML (`data-actor-id`, `data-item-id`, `data-actor-uuid`, `data-item-uuid`), and combat combatants. At export time, any referenced actor/item not already in the activity records gets a minimal snapshot added.
+
+**Minimal snapshots:** `_minimalActorSnapshot` includes `hp`, `hpMax`, `ac`, `disposition` — no full system blob. `_minimalItemSnapshot` includes `actionType`, `damage.parts`, `activation` — no full system blob. These replace the per-entity system dump for non-`full_snapshot` modes.
+
+**Chat message improvements:** `normalizeChat` now adds `contentText` (HTML stripped), `title` (first heading/item-name), `category` (`roll`/`emote`/`ooc`/`whisper`/`ic`), `referencedActorIds`, `referencedItemIds`. Speaker is sanitized to `{ userId, userName, actorId, actorName, tokenId, sceneId, sceneName }` — never a full User document.
+
+**New setting: `includeRawHtml`** (default `true`) — set to `false` to omit `contentRaw` from chat exports and reduce payload size.
+
+**Schema version bumped to `1.1.0`** — the `captureMode` field is now present at the root of the payload. The web app should continue to accept `1.0.0` exports.
+
+**Summary counts updated:** `actorReferenceCount`, `itemReferenceCount`, `sceneVisitedCount`, `journalReferenceCount` replace the old generic snapshot counts. `snapshotActorCount`/`snapshotItemCount`/`snapshotSceneCount` only appear when `captureMode === full_snapshot`.
+
 ## 0.3.9 — Payload Array Logging
 
 Added `console.log` in `syncSession` immediately before the POST fires. Logs the envelope's top-level keys and the length of every array in the nested payload object so it's easy to confirm data was captured before it hits the server.

@@ -1,7 +1,7 @@
 export const MODULE_ID = "tablecodex-sync";
 export const MODULE_TITLE = "TableCodex Sync";
 export const SCHEMA_VERSION = "1.0.0";
-export const MODULE_VERSION = "0.3.9";
+export const MODULE_VERSION = "0.4.0";
 
 console.log("[TableCodex Sync] settings.js evaluated");
 
@@ -107,6 +107,31 @@ export function registerSettings() {
   S.register(m, "captureSceneSnapshots", {
     name: "TABLECODEX.Settings.CaptureSceneSnapshots.Name",
     hint: "TABLECODEX.Settings.CaptureSceneSnapshots.Hint",
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: true,
+    restricted: true,
+  });
+
+  S.register(m, "captureMode", {
+    name: "TABLECODEX.Settings.CaptureMode.Name",
+    hint: "TABLECODEX.Settings.CaptureMode.Hint",
+    scope: "world",
+    config: true,
+    type: String,
+    choices: {
+      "minimal":        "TABLECODEX.Settings.CaptureMode.Minimal",
+      "standard":       "TABLECODEX.Settings.CaptureMode.Standard",
+      "full_snapshot":  "TABLECODEX.Settings.CaptureMode.FullSnapshot",
+    },
+    default: "standard",
+    restricted: true,
+  });
+
+  S.register(m, "includeRawHtml", {
+    name: "TABLECODEX.Settings.IncludeRawHtml.Name",
+    hint: "TABLECODEX.Settings.IncludeRawHtml.Hint",
     scope: "world",
     config: true,
     type: Boolean,
