@@ -4,6 +4,8 @@ import { exportJson, exportMarkdown, syncSession, retrySyncSession, forceSyncSes
 import { apiClient } from "./api-client.js";
 import { getPendingSessions, archiveSession } from "./session-store.js";
 
+console.log("[TableCodex Sync] ui.js evaluated");
+
 // ---------------------------------------------------------------------------
 // Main panel
 // ---------------------------------------------------------------------------

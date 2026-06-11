@@ -1,7 +1,9 @@
 export const MODULE_ID = "tablecodex-sync";
 export const MODULE_TITLE = "TableCodex Sync";
 export const SCHEMA_VERSION = "1.0.0";
-export const MODULE_VERSION = "0.3.4";
+export const MODULE_VERSION = "0.3.5";
+
+console.log("[TableCodex Sync] settings.js evaluated");
 
 export function registerSettings() {
   const S = game.settings;

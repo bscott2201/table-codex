@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.3.5 — Hook Registration Fix
+
+**Root cause fixed:** `class TableCodexPanelMenuShim extends FormApplication` was at module scope (line 16 of main.js). ESModule top-level code executes at parse time — before `init` fires, before Foundry's class globals are ready. If `FormApplication` is undefined at that instant the whole file throws and zero hooks register, which matched the observed symptom exactly.
+
+**Fix:** `TableCodexSettingsMenu` class is now defined inside `registerSettingsMenu()`, which is called from inside the `init` hook callback. It's only evaluated after Foundry's core has initialized.
+
+**`templates/blank.hbs`** — added; `registerMenu` requires a template path even for a shim.
+
+**Per-file diagnostics** — `console.log("[TableCodex Sync] X.js evaluated")` added to `settings.js`, `ui.js`, `session-recorder.js`, and `main.js`. If a file fails to evaluate its log will be absent, pointing directly at the broken import.
+
+**`globalThis.TableCodexSync`** — a loading-state stub is set immediately after imports (before hooks), then replaced with the full object during `ready`. `TableCodexSync.openPanel()` is safe to call from the console at any point after the module loads.
+
+**String concatenation** — replaced all template literals in hook-critical paths with plain string concatenation (`+`) to avoid any edge-case parsing issues.
+
+**`renderSettings` DOM injection removed** — replaced entirely by `game.settings.registerMenu`.
+
 ## 0.3.4 — UI Hardening Pass
 
 - `window.TableCodexSync` now includes `openUnsyncedDialog`, `getSetting`, `setSetting` in addition to `openPanel`, `refreshPanel`, `sessionRecorder`, `apiClient`

@@ -3,6 +3,8 @@ import { log, debug } from "./logger.js";
 import { getWorldInfo } from "./world-info.js";
 import { saveUnsyncedSession } from "./session-store.js";
 
+console.log("[TableCodex Sync] session-recorder.js evaluated");
+
 // In-memory session state. Also persisted to world settings for reload recovery.
 let _session = null;
 let _events = [];
