@@ -32,6 +32,9 @@ function _filename(ext) {
 // ---------------------------------------------------------------------------
 
 export function exportJson() {
+  if (!(getSetting("selectedCampaignId") ?? "").trim()) {
+    ui.notifications.warn(game.i18n.localize("TABLECODEX.Warn.NoCampaignExport"));
+  }
   const payload = sessionRecorder.buildPayload();
   const json = JSON.stringify(payload, null, 2);
   _download(json, _filename("json"), "application/json");
@@ -44,6 +47,9 @@ export function exportJson() {
 // ---------------------------------------------------------------------------
 
 export function exportMarkdown() {
+  if (!(getSetting("selectedCampaignId") ?? "").trim()) {
+    ui.notifications.warn(game.i18n.localize("TABLECODEX.Warn.NoCampaignExport"));
+  }
   const payload = sessionRecorder.buildPayload();
   const md = _buildMarkdown(payload);
   _download(md, _filename("md"), "text/markdown");

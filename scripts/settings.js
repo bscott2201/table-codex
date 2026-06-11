@@ -1,7 +1,7 @@
 export const MODULE_ID = "tablecodex-sync";
 export const MODULE_TITLE = "TableCodex Sync";
 export const SCHEMA_VERSION = "1.0.0";
-export const MODULE_VERSION = "0.2.3";
+export const MODULE_VERSION = "0.2.4";
 
 export function registerSettings() {
   const S = game.settings;
@@ -152,6 +152,10 @@ export function registerSettings() {
     config: false,
     type: String,
     default: "",
+    onChange: () => {
+      // Clear the world-link confirmation whenever the campaign selection changes.
+      game.settings.set(m, "worldLinked", false);
+    },
   });
 
   S.register(m, "selectedCampaignName", {
@@ -159,6 +163,14 @@ export function registerSettings() {
     config: false,
     type: String,
     default: "",
+  });
+
+  // True once POST /connect succeeds for the current campaign + world pair.
+  S.register(m, "worldLinked", {
+    scope: "world",
+    config: false,
+    type: Boolean,
+    default: false,
   });
 }
 

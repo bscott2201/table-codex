@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.2.4 — Decoupled Connection Flow & Localization Fix
+
+**Flow changes:**
+- Test API Connection (`pingApi`) now calls GET `/api/integrations/foundry/ping` — no campaign required
+- Fetch Campaigns also requires only URL + token, no campaign
+- Link World to Campaign calls POST `/api/integrations/foundry/connect` — requires campaign
+- Sync still requires campaign; JSON/MD export warns but does not block when no campaign is selected
+
+**Validators split:**
+- `validateApiCredentials()` — URL + token only (ping, fetchCampaigns)
+- `validateReadyToSync()` — URL + token + campaign (linkWorld, syncSession)
+
+**New `worldLinked` setting** — set true on successful `linkWorld()`, reset automatically when campaign selection changes
+
+**Panel states** — three independent indicators: API (`untested/ok/failed`), Campaign (`selected/not`), World Link (`linked/not`)
+
+**Localization fix:**
+- Root cause: `TABLECODEX.Panel.Status` (string) and `TABLECODEX.Panel.Status.Campaign` (child path) cannot coexist — Foundry can't traverse through a string value
+- Fix: panel template now uses plain string literals for UI labels; `game.i18n.*` used only in JS for notifications, dialogs, and error messages
+- `lang/en.json` fully rebuilt with correct nesting — 34 keys verified to resolve correctly
+- Removed all orphaned/unused keys from en.json
+
 ## 0.2.3 — Campaign Selector
 
 - New settings: `selectedCampaignId`, `selectedCampaignName` (stored internally, not shown in config)

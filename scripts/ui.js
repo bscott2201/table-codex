@@ -10,18 +10,20 @@ import { apiClient } from "./api-client.js";
 export class TableCodexPanel extends Application {
   constructor(...args) {
     super(...args);
-    this._campaigns = []; // populated by fetchCampaigns, survives re-renders
+    // Transient state — resets on page reload (appropriate, API availability is unknown)
+    this._campaigns  = [];               // populated by fetchCampaigns
+    this._apiState   = "untested";       // "untested" | "ok" | "failed"
   }
 
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
-      id: "tablecodex-panel",
-      title: "TableCodex Sync",
-      template: "modules/tablecodex-sync/templates/session-panel.hbs",
-      width: 380,
-      height: "auto",
+      id:        "tablecodex-panel",
+      title:     "TableCodex Sync",
+      template:  "modules/tablecodex-sync/templates/session-panel.hbs",
+      width:     380,
+      height:    "auto",
       resizable: false,
-      classes: ["tablecodex-panel"],
+      classes:   ["tablecodex-panel"],
     });
   }
 
@@ -31,30 +33,29 @@ export class TableCodexPanel extends Application {
     const isActive     = sessionRecorder.isActive;
     const campaignId   = getSetting("selectedCampaignId")   ?? "";
     const campaignName = getSetting("selectedCampaignName") ?? "";
-    const apiUrl       = (getSetting("tablecodexApiUrl") ?? "").trim();
-    const hasToken     = !!(cleanToken(getSetting("apiToken")));
-    const hasCampaign  = !!campaignId;
-
-    // Token display: length indicator only
-    const tokenLen  = cleanToken(getSetting("apiToken")).length;
-    const tokenHint = tokenLen > 0 ? `configured (${tokenLen} chars)` : "not set";
+    const worldLinked  = getSetting("worldLinked")          ?? false;
+    const apiUrl       = (getSetting("tablecodexApiUrl")    ?? "").trim();
+    const tokenLen     = cleanToken(getSetting("apiToken")).length;
 
     return {
-      // Connection status
-      apiUrl,
-      hasApiUrl: !!apiUrl,
-      hasToken,
-      tokenHint,
-      hasCampaign,
+      // API connection state
+      apiState:   this._apiState,        // "untested" | "ok" | "failed"
+      hasApiUrl:  !!apiUrl,
+      hasToken:   tokenLen > 0,
+      tokenHint:  tokenLen > 0 ? `configured (${tokenLen} chars)` : "not set",
+
+      // Campaign / world-link state
+      hasCampaign:  !!(campaignId.trim()),
       campaignId,
       campaignName,
+      worldLinked,
       worldName: game.world?.title ?? "",
 
-      // Campaign selector state
-      campaigns: this._campaigns,
+      // Campaign selector
+      campaigns:          this._campaigns,
       hasFetchedCampaigns: this._campaigns.length > 0,
 
-      // Session state
+      // Session
       isActive,
       sessionTitle:   sess?.sessionTitle   ?? "",
       localSessionId: sess?.localSessionId ?? "—",
@@ -70,25 +71,39 @@ export class TableCodexPanel extends Application {
   activateListeners(html) {
     super.activateListeners(html);
 
-    html.find("[data-action='fetch-campaigns']").on("click",  () => this._onFetchCampaigns());
+    html.find("[data-action='ping-api']").on("click",        () => this._onPingApi());
+    html.find("[data-action='fetch-campaigns']").on("click", () => this._onFetchCampaigns());
     html.find("[data-action='save-campaign']").on("click",   () => this._onSaveCampaign(html));
+    html.find("[data-action='link-world']").on("click",      () => this._onLinkWorld());
     html.find("[data-action='start-session']").on("click",   () => this._onStartSession());
     html.find("[data-action='end-session']").on("click",     () => this._onEndSession());
     html.find("[data-action='export-json']").on("click",     () => exportJson());
     html.find("[data-action='export-md']").on("click",       () => exportMarkdown());
     html.find("[data-action='sync-session']").on("click",    () => this._onSync());
     html.find("[data-action='clear-buffer']").on("click",    () => this._onClearBuffer());
-    html.find("[data-action='test-connection']").on("click", () => apiClient.testConnection());
     html.find("[data-action='open-settings']").on("click",   () => new SettingsConfig({}).render(true));
   }
 
+  // Step 1 — verify token is valid (no campaign required)
+  async _onPingApi() {
+    const result = await apiClient.pingApi();
+    this._apiState = result.success ? "ok" : "failed";
+    this.render();
+
+    // Auto-fetch campaigns on first successful ping
+    if (result.success && this._campaigns.length === 0) {
+      await this._onFetchCampaigns();
+    }
+  }
+
+  // Step 2 — populate campaign list (no campaign required)
   async _onFetchCampaigns() {
     const result = await apiClient.fetchCampaigns();
     if (!result.success) return;
 
     this._campaigns = result.campaigns;
 
-    // Auto-select if exactly one campaign and nothing is saved yet
+    // Auto-select if only one campaign exists and none is saved yet
     if (result.campaigns.length === 1 && !(getSetting("selectedCampaignId") ?? "").trim()) {
       const c = result.campaigns[0];
       await setSetting("selectedCampaignId",   c.id);
@@ -103,9 +118,9 @@ export class TableCodexPanel extends Application {
     this.render();
   }
 
+  // Step 3a — save campaign selection from dropdown
   async _onSaveCampaign(html) {
-    const select = html.find("[data-campaign-select]");
-    const id = select.val();
+    const id = html.find("[data-campaign-select]").val();
     if (!id) {
       ui.notifications.warn(game.i18n.localize("TABLECODEX.Warn.NoCampaignSelected"));
       return;
@@ -119,6 +134,13 @@ export class TableCodexPanel extends Application {
       game.i18n.format("TABLECODEX.Notify.CampaignLinked", { name: campaign.name })
     );
     this.render();
+  }
+
+  // Step 3b — confirm the campaign + world pairing with the server
+  async _onLinkWorld() {
+    const result = await apiClient.linkWorld();
+    this.render();
+    return result;
   }
 
   async _onStartSession() {

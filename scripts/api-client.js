@@ -1,4 +1,4 @@
-import { MODULE_ID, getSetting, cleanToken } from "./settings.js";
+import { MODULE_ID, getSetting, setSetting, cleanToken } from "./settings.js";
 import { log, debug } from "./logger.js";
 
 // ---------------------------------------------------------------------------
@@ -13,6 +13,31 @@ export function buildApiUrl(path) {
   const raw = getSetting("tablecodexApiUrl") ?? "";
   if (!raw.trim()) throw new Error(game.i18n.localize("TABLECODEX.Error.NoApiUrl"));
   return `${normalizeBaseUrl(raw)}/api${path}`;
+}
+
+// ---------------------------------------------------------------------------
+// Validators
+// ---------------------------------------------------------------------------
+
+// Requires only URL + token — used by ping and fetchCampaigns.
+export function validateApiCredentials() {
+  if (!(getSetting("tablecodexApiUrl") ?? "").trim()) {
+    return game.i18n.localize("TABLECODEX.Error.NoApiUrl");
+  }
+  if (!cleanToken(getSetting("apiToken"))) {
+    return game.i18n.localize("TABLECODEX.Error.NoApiToken");
+  }
+  return null;
+}
+
+// Requires URL + token + campaign — used by linkWorld and syncSession.
+export function validateReadyToSync() {
+  const base = validateApiCredentials();
+  if (base) return base;
+  if (!(getSetting("selectedCampaignId") ?? "").trim()) {
+    return game.i18n.localize("TABLECODEX.Error.NoCampaign");
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -33,28 +58,6 @@ function _headers() {
   };
 }
 
-// Validates that url, token, and campaign are all present. Returns an error
-// message string, or null if everything is ready.
-export function validateReadyToConnect() {
-  if (!(getSetting("tablecodexApiUrl") ?? "").trim()) {
-    return game.i18n.localize("TABLECODEX.Error.NoApiUrl");
-  }
-  if (!cleanToken(getSetting("apiToken"))) {
-    return game.i18n.localize("TABLECODEX.Error.NoApiToken");
-  }
-  if (!(getSetting("selectedCampaignId") ?? "").trim()) {
-    return game.i18n.localize("TABLECODEX.Error.NoCampaign");
-  }
-  return null;
-}
-
-export function validateReadyToSync() {
-  const base = validateReadyToConnect();
-  if (base) return base;
-  return null;
-}
-
-// Structured error that carries the HTTP status through the catch boundary.
 class ApiError extends Error {
   constructor(status, message) {
     super(message);
@@ -92,7 +95,7 @@ async function _request(method, path, body) {
         bodyText = await res.text();
         bodyMsg = bodyText || null;
       }
-    } catch { /* ignore body parse errors */ }
+    } catch { /* ignore */ }
 
     debug(
       `API error — status: ${res.status}, url: ${url},`,
@@ -109,11 +112,7 @@ async function _request(method, path, body) {
   return { ok: true };
 }
 
-// ---------------------------------------------------------------------------
-// Status-specific user messages
-// ---------------------------------------------------------------------------
-
-function _connectionErrorMessage(err) {
+function _authErrorMessage(err) {
   if (err instanceof ApiError) {
     if (err.status === 401) return "Missing or invalid TableCodex API token.";
     if (err.status === 403) return "TableCodex rejected the token. Regenerate the Foundry token in TableCodex and paste it here.";
@@ -126,7 +125,39 @@ function _connectionErrorMessage(err) {
 // ---------------------------------------------------------------------------
 
 export const apiClient = {
+  // Verifies the API URL is reachable and the token is valid.
+  // Does NOT require a selected campaign.
+  async pingApi() {
+    const invalid = validateApiCredentials();
+    if (invalid) {
+      ui.notifications.warn(`TableCodex: ${invalid}`);
+      return { success: false, error: invalid };
+    }
+
+    debug("pingApi — url:", buildApiUrl("/integrations/foundry/ping"));
+
+    try {
+      const result = await _request("GET", "/integrations/foundry/ping");
+      log("Ping OK:", result?.status, "| scopes:", result?.availableScopes?.join(", "));
+      ui.notifications.info(game.i18n.localize("TABLECODEX.Notify.PingOk"));
+      return { success: true, data: result };
+    } catch (err) {
+      const userMsg = _authErrorMessage(err);
+      ui.notifications.error(`TableCodex: ${userMsg}`);
+      log(`pingApi failed — ${err.status ? `HTTP ${err.status} — ` : ""}${err.message}`);
+      return { success: false, error: err.message, status: err.status ?? null };
+    }
+  },
+
+  // Fetches campaigns available to the authenticated token.
+  // Does NOT require a selected campaign.
   async fetchCampaigns() {
+    const invalid = validateApiCredentials();
+    if (invalid) {
+      ui.notifications.warn(`TableCodex: ${invalid}`);
+      return { success: false, campaigns: [], error: invalid };
+    }
+
     try {
       const result = await _request("GET", "/integrations/foundry/campaigns");
       const campaigns = result?.campaigns ?? [];
@@ -134,45 +165,51 @@ export const apiClient = {
       debug("Campaigns:", campaigns.map((c) => `${c.name} (${c.id})`).join(", "));
       return { success: true, campaigns };
     } catch (err) {
-      const userMsg = _connectionErrorMessage(err);
+      const userMsg = _authErrorMessage(err);
       ui.notifications.error(`TableCodex: ${userMsg}`);
       log(`fetchCampaigns failed — ${err.status ? `HTTP ${err.status} — ` : ""}${err.message}`);
       return { success: false, campaigns: [], error: err.message };
     }
   },
 
-  async testConnection() {
-    const invalid = validateReadyToConnect();
+  // Confirms the selected campaign + world pairing with the server.
+  // Requires a selected campaign.
+  async linkWorld() {
+    const invalid = validateReadyToSync();
     if (invalid) {
       ui.notifications.warn(`TableCodex: ${invalid}`);
       return { success: false, error: invalid };
     }
 
-    const campaignId   = getSetting("selectedCampaignId")   ?? "";
-    const campaignName = getSetting("selectedCampaignName")  ?? "";
+    const campaignId   = getSetting("selectedCampaignId")  ?? "";
+    const campaignName = getSetting("selectedCampaignName") ?? "";
 
-    const connectBody = {
+    const body = {
       campaignId,
       foundryWorldId:   game.world?.id    ?? "",
       foundryWorldName: game.world?.title ?? "",
       systemId:         game.system?.id   ?? "",
       foundryVersion:   game.version      ?? "14",
-      moduleVersion:    game.modules.get(MODULE_ID)?.version ?? "0.2.3",
+      moduleVersion:    game.modules.get(MODULE_ID)?.version ?? "0.2.4",
     };
 
-    debug("testConnection — url:", buildApiUrl("/integrations/foundry/connect"));
-    debug("testConnection — body:", JSON.stringify({ ...connectBody }));
-    debug(`testConnection — campaignId: ${campaignId}, campaignName: ${campaignName}`);
+    debug("linkWorld — url:", buildApiUrl("/integrations/foundry/connect"));
+    debug("linkWorld — body:", JSON.stringify(body));
+    debug(`linkWorld — campaignId: ${campaignId}, campaignName: ${campaignName}`);
 
     try {
-      const result = await _request("POST", "/integrations/foundry/connect", connectBody);
-      log("Connection test OK:", result);
-      ui.notifications.info(game.i18n.localize("TABLECODEX.Notify.ConnectionOk"));
+      const result = await _request("POST", "/integrations/foundry/connect", body);
+      await setSetting("worldLinked", true);
+      log("World linked OK:", result);
+      ui.notifications.info(
+        game.i18n.format("TABLECODEX.Notify.WorldLinked", { campaign: campaignName })
+      );
       return { success: true, data: result };
     } catch (err) {
-      const userMsg = _connectionErrorMessage(err);
+      await setSetting("worldLinked", false);
+      const userMsg = _authErrorMessage(err);
       ui.notifications.error(`TableCodex: ${userMsg}`);
-      log(`testConnection failed — ${err.status ? `HTTP ${err.status} — ` : ""}${err.message}`);
+      log(`linkWorld failed — ${err.status ? `HTTP ${err.status} — ` : ""}${err.message}`);
       return { success: false, error: err.message, status: err.status ?? null };
     }
   },
@@ -192,7 +229,7 @@ export const apiClient = {
       return { success: true, importId };
     } catch (err) {
       const userMsg = err instanceof ApiError && (err.status === 401 || err.status === 403)
-        ? _connectionErrorMessage(err)
+        ? _authErrorMessage(err)
         : err.message;
       ui.notifications.error(`${game.i18n.localize("TABLECODEX.Notify.SyncFailed")}: ${userMsg}`);
       return { success: false, error: err.message, status: err.status ?? null };

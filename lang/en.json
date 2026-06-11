@@ -1,11 +1,6 @@
 {
   "TABLECODEX": {
     "Settings": {
-      "Section": {
-        "Api": "API Connection",
-        "Privacy": "Privacy",
-        "Capture": "Capture Options"
-      },
       "ApiUrl": {
         "Name": "TableCodex API URL",
         "Hint": "Base URL of your TableCodex instance (e.g. https://app.tablecodex.com)."
@@ -55,44 +50,6 @@
         "Hint": "Log verbose capture events to the browser console."
       }
     },
-    "Panel": {
-      "Status": "Status",
-      "Status.Campaign": "Campaign",
-      "Status.World": "World",
-      "Status.Token": "Token",
-      "Status.LastSync": "Last Sync",
-      "Status.NoCampaign": "No campaign selected",
-      "Status.NoToken": "Not configured",
-      "Status.Synced": "Synced",
-      "Status.Unsynced": "Pending sync",
-      "Campaign": "Campaign",
-      "FetchCampaigns": "Fetch Campaigns",
-      "SelectCampaign": "Select a campaign",
-      "LinkCampaign": "Link World to Campaign",
-      "CurrentCampaign": "Current campaign",
-      "SessionInfo": "Session",
-      "SessionTitle": "Title",
-      "Started": "Started",
-      "Ended": "Ended",
-      "ImportId": "Import ID",
-      "Captured": "Captured",
-      "ChatMessages": "chat messages",
-      "Rolls": "rolls",
-      "CombatEvents": "combat events",
-      "Scenes": "scenes",
-      "ActorSnapshots": "actor snapshots",
-      "ItemSnapshots": "item snapshots",
-      "Journals": "journals",
-      "StartSession": "Start Session",
-      "EndSession": "End Session",
-      "ExportJson": "Export JSON",
-      "ExportMd": "Export Markdown",
-      "Sync": "Sync to TableCodex",
-      "ReSync": "Re-Sync",
-      "Clear": "Clear Buffer",
-      "TestConnection": "Test Connection",
-      "Settings": "Settings"
-    },
     "Controls": {
       "StartSession": "Start TC Session",
       "StopSession": "Stop TC Session"
@@ -121,32 +78,29 @@
       }
     },
     "Notify": {
-      "ConnectionOk": "TableCodex: Connection successful.",
-      "ConnectionFailed": "TableCodex: Connection failed",
+      "PingOk": "TableCodex: API connection verified.",
       "SyncOk": "TableCodex: Session synced successfully.",
       "SyncFailed": "TableCodex: Sync failed",
       "ExportJsonOk": "TableCodex: JSON exported.",
       "ExportMdOk": "TableCodex: Markdown exported.",
       "SessionResumed": "TableCodex: Resumed active session from before reload.",
       "SessionPendingExport": "TableCodex: You have an unsaved session ready to export or sync.",
-      "CampaignLinked": "TableCodex: Linked to campaign \"{name}\".",
-      "CampaignAutoSelected": "TableCodex: Campaign \"{name}\" auto-selected."
+      "CampaignLinked": "TableCodex: Campaign \"{name}\" selected.",
+      "CampaignAutoSelected": "TableCodex: Campaign \"{name}\" auto-selected.",
+      "WorldLinked": "TableCodex: World linked to \"{campaign}\"."
     },
     "Warn": {
       "LargePayload": "TableCodex: Session payload is large (>5 MB). Sync may be slow.",
       "NoCampaignsFound": "TableCodex: No campaigns found. Check your API URL and token.",
       "NoCampaignSelected": "Select a campaign from the list first.",
-      "NoCampaignForSession": "No campaign selected. Select a campaign before syncing."
+      "NoCampaignForSession": "No campaign selected. Select a campaign before syncing.",
+      "NoCampaignExport": "TableCodex: No campaign selected. You can choose a campaign during web upload."
     },
     "Error": {
       "NoApiUrl": "TableCodex API URL is not configured.",
       "NoApiToken": "TableCodex API token is not configured.",
       "NoCampaign": "Select a TableCodex campaign before connecting.",
       "NoSession": "No session data to sync."
-    },
-    "ExportSummary": {
-      "Intro": "Your session contains:",
-      "Choose": "Choose an export format below."
     }
   }
 }
