@@ -56,14 +56,15 @@ export async function markSessionPending(localSessionId) {
   await _update(localSessionId, { status: "sync_pending" });
 }
 
-export async function markSessionSynced(localSessionId, remoteImportId) {
+export async function markSessionSynced(localSessionId, remoteImportId, remoteIntakeId) {
   await _update(localSessionId, {
     status: "synced",
     remoteImportId,
+    remoteIntakeId: remoteIntakeId ?? null,
     lastSyncAttemptAt: new Date().toISOString(),
     lastSyncError: null,
   });
-  log(`Session store: ${localSessionId} → synced (importId: ${remoteImportId})`);
+  log(`Session store: ${localSessionId} → synced (importId: ${remoteImportId}, intakeId: ${remoteIntakeId ?? "none"})`);
 }
 
 export async function markSessionFailed(localSessionId, error) {

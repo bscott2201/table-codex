@@ -230,10 +230,11 @@ export const sessionRecorder = {
     };
   },
 
-  markSynced(importId) {
+  markSynced(importId, intakeId) {
     if (_session) {
       _session.synced = true;
       _session.remoteImportId = importId;
+      _session.remoteIntakeId = intakeId ?? null;
       _persist();
     }
   },

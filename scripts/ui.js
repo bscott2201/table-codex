@@ -61,8 +61,9 @@ export class TableCodexPanel extends Application {
       localSessionId: sess?.localSessionId ?? "—",
       startedAt: sess?.startedAt ? new Date(sess.startedAt).toLocaleString() : "—",
       endedAt:   sess?.endedAt   ? new Date(sess.endedAt).toLocaleString()   : "—",
-      synced:         sess?.synced         ?? false,
-      remoteImportId: sess?.remoteImportId ?? null,
+      synced:          sess?.synced          ?? false,
+      remoteImportId:  sess?.remoteImportId  ?? null,
+      remoteIntakeId:  sess?.remoteIntakeId  ?? null,
       stats,
       hasSession: sess !== null,
     };

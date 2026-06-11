@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.8 — Sync Success / Intake Flow
+
+**New response shape handled:** `POST /session-import` may now return `{ importId, intakeId, status, message }` in addition to the legacy `{ importId }` shape. Both shapes work.
+
+**`_notifySyncSuccess(result)`** — shared helper called by `syncSession`, `retrySyncSession`, and `forceSyncSession`. Shows `result.message` from the server when present (e.g. "VTT session received. Add audio or continue without audio."), otherwise falls back to "Session uploaded to TableCodex. Finish intake on your campaign dashboard." If the server ever returns `dashboardUrl` or `intakeUrl`, copies it to clipboard automatically.
+
+**`markSynced(importId, intakeId)`** in `session-recorder.js` — stores `remoteIntakeId` on the in-memory session alongside `remoteImportId`.
+
+**`markSessionSynced(localSessionId, remoteImportId, remoteIntakeId)`** in `session-store.js` — persists `remoteIntakeId` to the unsynced sessions store.
+
+**Panel** — synced session now shows: "Uploaded" status indicator, Intake ID (if present), Import ID, and "Finish intake on your campaign dashboard." hint.
+
+Audio upload is intentionally NOT implemented in this module — audio attachment happens in the TableCodex web app intake flow.
+
 ## 0.3.7 — campaignId Type Fix
 
 **Root cause:** `selectedCampaignId` is stored as a string in Foundry settings (settings system only accepts `String` type). The TableCodex API schema requires `campaignId: number`. Every API call was sending `campaignId: "6"` when the server expected `campaignId: 6`.

@@ -103,7 +103,12 @@
       <dt>ID</dt><dd class="tc-mono">{{localSessionId}}</dd>
       <dt>Started</dt><dd>{{startedAt}}</dd>
       {{#unless isActive}}<dt>Ended</dt><dd>{{endedAt}}</dd>{{/unless}}
-      {{#if synced}}<dt>Import ID</dt><dd class="tc-mono">{{remoteImportId}}</dd>{{/if}}
+      {{#if synced}}
+        <dt>Status</dt><dd><span class="tc-status-ok"><i class="fas fa-check-circle"></i> Uploaded</span></dd>
+        {{#if remoteIntakeId}}<dt>Intake ID</dt><dd class="tc-mono">{{remoteIntakeId}}</dd>{{/if}}
+        {{#if remoteImportId}}<dt>Import ID</dt><dd class="tc-mono">{{remoteImportId}}</dd>{{/if}}
+        <dt></dt><dd class="tc-hint">Finish intake on your campaign dashboard.</dd>
+      {{/if}}
     </dl>
   </section>
 

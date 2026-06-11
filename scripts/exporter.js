@@ -199,8 +199,10 @@ export async function syncSession() {
   var result = await apiClient.syncSession(envelope);
 
   if (result.success && result.importId) {
-    sessionRecorder.markSynced(result.importId);
-    await markSessionSynced(sess.localSessionId, result.importId);
+    var intakeId = result.intakeId || null;
+    sessionRecorder.markSynced(result.importId, intakeId);
+    await markSessionSynced(sess.localSessionId, result.importId, intakeId);
+    _notifySyncSuccess(result);
   } else {
     await markSessionFailed(sess.localSessionId, result.error || "Unknown error");
   }
@@ -259,7 +261,9 @@ export async function retrySyncSession(localSessionId) {
   var result = await apiClient.syncSession(envelope);
 
   if (result.success && result.importId) {
-    await markSessionSynced(localSessionId, result.importId);
+    var retryIntakeId = result.intakeId || null;
+    await markSessionSynced(localSessionId, result.importId, retryIntakeId);
+    _notifySyncSuccess(result);
     log("retrySyncSession: " + localSessionId + " synced, importId: " + result.importId);
   } else {
     await markSessionFailed(localSessionId, result.error || "Unknown error");
@@ -336,7 +340,9 @@ export async function forceSyncSession(localSessionId) {
   var result = await apiClient.syncSession(envelope);
 
   if (result.success && result.importId) {
-    await markSessionSynced(localSessionId, result.importId);
+    var forceIntakeId = result.intakeId || null;
+    await markSessionSynced(localSessionId, result.importId, forceIntakeId);
+    _notifySyncSuccess(result);
     log("forceSyncSession: " + localSessionId + " synced, importId: " + result.importId);
   } else {
     await markSessionFailed(localSessionId, result.error || "Unknown error");
@@ -347,6 +353,37 @@ export async function forceSyncSession(localSessionId) {
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Shows a Foundry notification after a successful session sync.
+ * Handles both the legacy { importId } shape and the new
+ * { importId, intakeId, status, message } intake-flow shape.
+ * If the response ever includes a dashboard URL, copies it to clipboard.
+ */
+function _notifySyncSuccess(result) {
+  var msg = "Session uploaded to TableCodex. Finish intake on your campaign dashboard.";
+
+  // Surface the server's own message when it adds context (e.g. audio prompt)
+  if (result.message && typeof result.message === "string") {
+    msg = result.message;
+  }
+
+  ui.notifications.info("TableCodex: " + msg);
+  log("Sync success — importId:", result.importId, "intakeId:", result.intakeId || "none", "status:", result.status || "none");
+
+  // Future-proof: if the server returns a dashboard/intake URL, copy it to clipboard
+  if (result.dashboardUrl || result.intakeUrl) {
+    var url = result.dashboardUrl || result.intakeUrl;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(function() {
+        ui.notifications.info("TableCodex: Intake URL copied to clipboard.");
+      }).catch(function() {
+        // Silent — clipboard access can be blocked by browser policy
+      });
+    }
+    log("Intake URL:", url);
+  }
+}
 
 function _getRecord(localSessionId) {
   var sessions = getUnsyncedSessions();
