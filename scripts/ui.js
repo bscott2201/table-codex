@@ -12,7 +12,7 @@ export class TableCodexPanel extends Application {
     super(...args);
     // Transient state — resets on page reload (appropriate, API availability is unknown)
     this._campaigns  = [];               // populated by fetchCampaigns
-    this._apiState   = "untested";       // "untested" | "ok" | "failed"
+    this._apiState   = "untested";       // "untested" | "ok" | "unavailable" | "failed"
   }
 
   static get defaultOptions() {
@@ -87,12 +87,24 @@ export class TableCodexPanel extends Application {
   // Step 1 — verify token is valid (no campaign required)
   async _onPingApi() {
     const result = await apiClient.pingApi();
-    this._apiState = result.success ? "ok" : "failed";
+
+    if (result.success) {
+      this._apiState = "ok";
+    } else if (result.notFound) {
+      // 404 means the ping route isn't deployed yet — treat as "unavailable" not "broken"
+      this._apiState = "unavailable";
+    } else {
+      this._apiState = "failed";
+    }
+
     this.render();
 
-    // Auto-fetch campaigns on first successful ping
-    if (result.success && this._campaigns.length === 0) {
-      await this._onFetchCampaigns();
+    // Auto-fetch campaigns regardless of ping outcome as long as credentials exist
+    // (ping 404 doesn't mean the token is bad)
+    if (result.success || result.notFound) {
+      if (this._campaigns.length === 0) {
+        await this._onFetchCampaigns();
+      }
     }
   }
 
@@ -103,14 +115,18 @@ export class TableCodexPanel extends Application {
 
     this._campaigns = result.campaigns;
 
-    // Auto-select if only one campaign exists and none is saved yet
-    if (result.campaigns.length === 1 && !(getSetting("selectedCampaignId") ?? "").trim()) {
+    // Auto-select if exactly one campaign and none is saved yet
+    const currentId = (getSetting("selectedCampaignId") ?? "").trim();
+    if (result.campaigns.length === 1 && !currentId) {
       const c = result.campaigns[0];
-      await setSetting("selectedCampaignId",   c.id);
-      await setSetting("selectedCampaignName", c.name);
-      ui.notifications.info(
-        game.i18n.format("TABLECODEX.Notify.CampaignAutoSelected", { name: c.name })
-      );
+      // Guard: only save if we have a real string id
+      if (c.id && typeof c.id === "string" && c.id.trim()) {
+        await setSetting("selectedCampaignId",   c.id.trim());
+        await setSetting("selectedCampaignName", c.name ?? "");
+        ui.notifications.info(
+          game.i18n.format("TABLECODEX.Notify.CampaignAutoSelected", { name: c.name })
+        );
+      }
     } else if (result.campaigns.length === 0) {
       ui.notifications.warn(game.i18n.localize("TABLECODEX.Warn.NoCampaignsFound"));
     }
@@ -120,16 +136,23 @@ export class TableCodexPanel extends Application {
 
   // Step 3a — save campaign selection from dropdown
   async _onSaveCampaign(html) {
-    const id = html.find("[data-campaign-select]").val();
-    if (!id) {
+    const rawId = html.find("[data-campaign-select]").val();
+
+    // Defensive: reject empty, "undefined", "null", "[object Object]"
+    const id = (typeof rawId === "string") ? rawId.trim() : "";
+    if (!id || id === "undefined" || id === "null" || id === "[object Object]") {
       ui.notifications.warn(game.i18n.localize("TABLECODEX.Warn.NoCampaignSelected"));
       return;
     }
+
     const campaign = this._campaigns.find((c) => c.id === id);
-    if (!campaign) return;
+    if (!campaign) {
+      ui.notifications.warn("Selected campaign not found in list. Try Fetch Campaigns again.");
+      return;
+    }
 
     await setSetting("selectedCampaignId",   campaign.id);
-    await setSetting("selectedCampaignName", campaign.name);
+    await setSetting("selectedCampaignName", campaign.name ?? "");
     ui.notifications.info(
       game.i18n.format("TABLECODEX.Notify.CampaignLinked", { name: campaign.name })
     );

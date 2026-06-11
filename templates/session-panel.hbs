@@ -20,6 +20,7 @@
       <dt>API</dt>
       <dd>
         {{#if (eq apiState "ok")}}<span class="tc-status-ok"><i class="fas fa-check-circle"></i> Connected</span>
+        {{else if (eq apiState "unavailable")}}<span class="tc-status-warn"><i class="fas fa-exclamation-triangle"></i> Ping N/A — use Fetch Campaigns</span>
         {{else if (eq apiState "failed")}}<span class="tc-status-err"><i class="fas fa-times-circle"></i> Failed</span>
         {{else}}<span class="tc-status-dim"><i class="fas fa-circle"></i> Not tested</span>
         {{/if}}

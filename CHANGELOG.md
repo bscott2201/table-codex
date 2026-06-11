@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.5 — Ping/Connect Hardening
+
+- `pingApi` 404 → new `"unavailable"` state; shows advisory "Ping endpoint not available yet. Try Fetch Campaigns to verify token access." and still auto-fetches campaigns (token may be valid even if ping route isn't deployed)
+- `ApiError` now carries `missingFields` parsed from response body; `linkWorld` surfaces them as "Missing required fields: campaignId, ..."
+- `linkWorld` body: `foundryWorldName` falls back to `game.world.id` if title is empty; all four fields pre-validated locally before fetch; full body logged on failure (no token)
+- `_safeCampaignId()` helper rejects `undefined`, `null`, `""`, `"[object Object]"` before any API call
+- `_onSaveCampaign` validates raw `<select>` value defensively before writing to settings
+- `_onFetchCampaigns` auto-select guard checks `typeof c.id === "string"` before saving
+- `MODULE_VERSION` imported directly into `api-client.js` as fallback for `game.modules.get()`
+- Panel shows amber "Ping N/A — use Fetch Campaigns" for `apiState: "unavailable"`
+
 ## 0.2.4 — Decoupled Connection Flow & Localization Fix
 
 **Flow changes:**

@@ -1,4 +1,4 @@
-import { MODULE_ID, getSetting, setSetting, cleanToken } from "./settings.js";
+import { MODULE_ID, MODULE_VERSION, getSetting, setSetting, cleanToken } from "./settings.js";
 import { log, debug } from "./logger.js";
 
 // ---------------------------------------------------------------------------
@@ -19,7 +19,6 @@ export function buildApiUrl(path) {
 // Validators
 // ---------------------------------------------------------------------------
 
-// Requires only URL + token — used by ping and fetchCampaigns.
 export function validateApiCredentials() {
   if (!(getSetting("tablecodexApiUrl") ?? "").trim()) {
     return game.i18n.localize("TABLECODEX.Error.NoApiUrl");
@@ -30,14 +29,24 @@ export function validateApiCredentials() {
   return null;
 }
 
-// Requires URL + token + campaign — used by linkWorld and syncSession.
 export function validateReadyToSync() {
   const base = validateApiCredentials();
   if (base) return base;
-  if (!(getSetting("selectedCampaignId") ?? "").trim()) {
+  if (!_safeCampaignId()) {
     return game.i18n.localize("TABLECODEX.Error.NoCampaign");
   }
   return null;
+}
+
+// Returns a clean campaign ID string, or null if it's missing/invalid.
+function _safeCampaignId() {
+  const raw = getSetting("selectedCampaignId");
+  if (!raw || typeof raw !== "string") return null;
+  const trimmed = raw.trim();
+  if (!trimmed || trimmed === "undefined" || trimmed === "null" || trimmed === "[object Object]") {
+    return null;
+  }
+  return trimmed;
 }
 
 // ---------------------------------------------------------------------------
@@ -59,9 +68,10 @@ function _headers() {
 }
 
 class ApiError extends Error {
-  constructor(status, message) {
+  constructor(status, message, missingFields) {
     super(message);
     this.status = status;
+    this.missingFields = missingFields ?? null;
   }
 }
 
@@ -85,11 +95,13 @@ async function _request(method, path, body) {
   if (!res.ok) {
     let bodyMsg = null;
     let bodyText = null;
+    let missingFields = null;
     try {
       const ct = res.headers.get("content-type") ?? "";
       if (ct.includes("application/json")) {
         const data = await res.json();
         bodyMsg = data?.message ?? data?.error ?? null;
+        missingFields = Array.isArray(data?.missingFields) ? data.missingFields : null;
         bodyText = JSON.stringify(data);
       } else {
         bodyText = await res.text();
@@ -100,11 +112,11 @@ async function _request(method, path, body) {
     debug(
       `API error — status: ${res.status}, url: ${url},`,
       `body: ${bodyText ?? "(empty)"},`,
-      `auth header present: ${!!opts.headers["Authorization"]},`,
+      `auth present: ${!!opts.headers["Authorization"]},`,
       `world: ${game.world?.id ?? "?"} / ${game.world?.title ?? "?"}`
     );
 
-    throw new ApiError(res.status, bodyMsg ?? `HTTP ${res.status}`);
+    throw new ApiError(res.status, bodyMsg ?? `HTTP ${res.status}`, missingFields);
   }
 
   const ct = res.headers.get("content-type") ?? "";
@@ -125,8 +137,8 @@ function _authErrorMessage(err) {
 // ---------------------------------------------------------------------------
 
 export const apiClient = {
-  // Verifies the API URL is reachable and the token is valid.
-  // Does NOT require a selected campaign.
+  // Step 1 — verify token is valid. Does NOT require a selected campaign.
+  // Gracefully handles 404 (endpoint not deployed yet) without blocking the flow.
   async pingApi() {
     const invalid = validateApiCredentials();
     if (invalid) {
@@ -142,6 +154,13 @@ export const apiClient = {
       ui.notifications.info(game.i18n.localize("TABLECODEX.Notify.PingOk"));
       return { success: true, data: result };
     } catch (err) {
+      // 404 means the route doesn't exist yet on the backend — not an auth failure.
+      if (err instanceof ApiError && err.status === 404) {
+        const advisory = "Ping endpoint not available yet. Try Fetch Campaigns to verify token access.";
+        ui.notifications.warn(`TableCodex: ${advisory}`);
+        log("pingApi: 404 — endpoint not deployed. Token may still be valid.");
+        return { success: false, notFound: true, error: advisory, status: 404 };
+      }
       const userMsg = _authErrorMessage(err);
       ui.notifications.error(`TableCodex: ${userMsg}`);
       log(`pingApi failed — ${err.status ? `HTTP ${err.status} — ` : ""}${err.message}`);
@@ -149,8 +168,7 @@ export const apiClient = {
     }
   },
 
-  // Fetches campaigns available to the authenticated token.
-  // Does NOT require a selected campaign.
+  // Step 2 — fetch available campaigns. Does NOT require a selected campaign.
   async fetchCampaigns() {
     const invalid = validateApiCredentials();
     if (invalid) {
@@ -172,30 +190,51 @@ export const apiClient = {
     }
   },
 
-  // Confirms the selected campaign + world pairing with the server.
-  // Requires a selected campaign.
+  // Step 3 — confirm campaign + world pairing. Requires a selected campaign.
   async linkWorld() {
-    const invalid = validateReadyToSync();
-    if (invalid) {
-      ui.notifications.warn(`TableCodex: ${invalid}`);
-      return { success: false, error: invalid };
+    // Validate campaign
+    const campaignId = _safeCampaignId();
+    if (!campaignId) {
+      const msg = "Select a TableCodex campaign before linking this world.";
+      ui.notifications.warn(`TableCodex: ${msg}`);
+      return { success: false, error: msg };
     }
 
-    const campaignId   = getSetting("selectedCampaignId")  ?? "";
+    // Validate world fields — backend 400s if these are missing
+    const foundryWorldId   = (game.world?.id    ?? "").trim();
+    const foundryWorldName = (game.world?.title ?? game.world?.id ?? "").trim();
+    const systemId         = (game.system?.id   ?? "").trim();
+    const foundryVersion   = (game.version      ?? "14").trim();
+
+    const missingLocally = [];
+    if (!foundryWorldId)   missingLocally.push("foundryWorldId");
+    if (!foundryWorldName) missingLocally.push("foundryWorldName");
+    if (!systemId)         missingLocally.push("systemId");
+
+    if (missingLocally.length > 0) {
+      const msg = `Cannot link world — missing: ${missingLocally.join(", ")}. Is the world fully loaded?`;
+      ui.notifications.error(`TableCodex: ${msg}`);
+      log("linkWorld pre-flight failed:", msg);
+      return { success: false, error: msg };
+    }
+
     const campaignName = getSetting("selectedCampaignName") ?? "";
+    const resolvedVersion = game.modules.get(MODULE_ID)?.version ?? MODULE_VERSION;
 
     const body = {
       campaignId,
-      foundryWorldId:   game.world?.id    ?? "",
-      foundryWorldName: game.world?.title ?? "",
-      systemId:         game.system?.id   ?? "",
-      foundryVersion:   game.version      ?? "14",
-      moduleVersion:    game.modules.get(MODULE_ID)?.version ?? "0.2.4",
+      foundryWorldId,
+      foundryWorldName,
+      systemId,
+      foundryVersion,
+      moduleVersion: resolvedVersion,
     };
 
     debug("linkWorld — url:", buildApiUrl("/integrations/foundry/connect"));
     debug("linkWorld — body:", JSON.stringify(body));
     debug(`linkWorld — campaignId: ${campaignId}, campaignName: ${campaignName}`);
+    debug(`linkWorld — foundryWorldId: ${foundryWorldId}, foundryWorldName: ${foundryWorldName}`);
+    debug(`linkWorld — systemId: ${systemId}, foundryVersion: ${foundryVersion}, moduleVersion: ${resolvedVersion}`);
 
     try {
       const result = await _request("POST", "/integrations/foundry/connect", body);
@@ -207,9 +246,29 @@ export const apiClient = {
       return { success: true, data: result };
     } catch (err) {
       await setSetting("worldLinked", false);
+
+      // Log every body field to help debug 400s — never log the token
+      log("linkWorld failed —",
+        `HTTP ${err.status ?? "?"} |`,
+        `campaignId: ${campaignId} |`,
+        `foundryWorldId: ${foundryWorldId} |`,
+        `foundryWorldName: ${foundryWorldName} |`,
+        `systemId: ${systemId} |`,
+        `foundryVersion: ${foundryVersion} |`,
+        `moduleVersion: ${resolvedVersion} |`,
+        `error: ${err.message}`
+      );
+
+      // Surface missingFields from the server response if present
+      if (err instanceof ApiError && err.status === 400 && err.missingFields?.length) {
+        const fieldList = err.missingFields.join(", ");
+        const msg = `Missing required fields: ${fieldList}`;
+        ui.notifications.error(`TableCodex: ${msg}`);
+        return { success: false, error: msg, status: 400 };
+      }
+
       const userMsg = _authErrorMessage(err);
       ui.notifications.error(`TableCodex: ${userMsg}`);
-      log(`linkWorld failed — ${err.status ? `HTTP ${err.status} — ` : ""}${err.message}`);
       return { success: false, error: err.message, status: err.status ?? null };
     }
   },
