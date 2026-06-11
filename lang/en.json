@@ -49,6 +49,15 @@
         "Name": "Debug Logging",
         "Hint": "Log verbose capture events to the browser console."
       },
+      "CaptureChat":           { "Name": "Capture Chat Messages",    "Hint": "Record chat messages and embedded rolls." },
+      "CaptureCombat":         { "Name": "Capture Combat Events",    "Hint": "Record combat start/end, round/turn changes, initiative, and defeated state." },
+      "CaptureActorUpdates":   { "Name": "Capture Actor Updates",    "Hint": "Record HP changes, healing, damage, and inventory changes." },
+      "CaptureTokenMovement":  { "Name": "Capture Token Movement",   "Hint": "Record token position changes (x/y/elevation)." },
+      "CaptureConditions":     { "Name": "Capture Conditions",       "Hint": "Record active effects and condition added/removed events." },
+      "CaptureJournals":       { "Name": "Capture Journal Events",   "Hint": "Record journal entry create/update events." },
+      "CapturePlaylists":      { "Name": "Capture Audio Cues",       "Hint": "Record playlist sound start/stop events. Default off (noisy)." },
+      "IncludeRawPayloads":    { "Name": "Include Raw Payloads",     "Hint": "Add a 'raw' field to each telemetry event with the original Foundry data. Increases export size." },
+      "TelemetryQueueMaxSize": { "Name": "Telemetry Queue Max Size", "Hint": "Maximum number of telemetry events to keep in memory. Oldest events are dropped when the limit is reached." },
       "CaptureMode": {
         "Name": "Capture Mode",
         "Hint": "Controls what gets captured during a session. Standard is recommended for normal play.",

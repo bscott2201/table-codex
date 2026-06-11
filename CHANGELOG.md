@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.5.0 — Rich Session Telemetry
+
+**New file: `scripts/telemetry-recorder.js`** — parallel event capture system that produces structured `TableCodexTelemetryEvent` objects for gameplay replay.
+
+**Event types captured:**
+- `chat_message` + embedded roll events (`attack_roll`, `damage_roll`, `healing_roll`, `saving_throw`, `ability_check`, `skill_check`, `initiative_roll`, `tool_check`)
+- `damage_applied` / `healing_applied` / `temp_hp_changed` / `actor_updated` — with HP before/after/delta
+- `token_moved` — with position before/after
+- `target_selected` / `target_cleared` — per-user target map
+- `combat_started` / `combat_round_changed` / `combat_turn_changed` / `combat_ended`
+- `initiative_set` / `combatant_defeated` / `combatant_revived`
+- `condition_added` / `condition_updated` / `condition_removed`
+- `item_created` / `item_updated` / `item_deleted`
+- `scene_viewed` / `scene_updated`
+- `template_placed` (AOE templates)
+- `journal_created` / `journal_updated`
+- `audio_cue` / `audio_started` / `audio_stopped`
+- `session_started` / `session_ended`
+
+**Each event includes:**
+- Full user context (id, name, role, isGM)
+- Scene context (id, name, active)
+- Combat context (id, round, turn, active combatant)
+- Actor/token snapshots where relevant
+- Action details (item name, spell level, save DC, damage parts) via dnd5e flag extraction
+- HP correlation: `damage_applied` events include a `correlatedAction` field linking to the most recent damage roll that targeted that actor
+
+**Pre-update snapshot pattern:** `preUpdateActor` and `preUpdateToken` hooks run at module scope (always, not just during session) to ensure before-state is captured. Event emission is gated on `_active === true`.
+
+**Target tracking:** `targetToken` hook maintains a per-user Map of current targets. When a chat roll fires, the user's current targets are embedded in the event as `targets[]`.
+
+**dnd5e extraction:** `_extractAction()` reads `message.flags.dnd5e`, `message.item` (3.x), and `message.item` embedded document to extract item name, type, spell level, activation, range, save DC, and damage parts.
+
+**HP correlation buffer:** A rolling buffer of the last 20 attack/damage rolls is maintained. When `damage_applied` fires, `_findRecentAction()` scans backwards for a damage roll that targeted the same actor.
+
+**Settings added:** `captureChat`, `captureCombat`, `captureActorUpdates`, `captureTokenMovement`, `captureConditions`, `captureJournals`, `capturePlaylists` (default off), `includeRawPayloads` (default off), `telemetryQueueMaxSize` (default 2000).
+
+**Payload:** `buildPayload()` now includes `telemetryEvents: []` alongside the existing legacy arrays. Legacy arrays are preserved for backwards compatibility.
+
+**`window.TableCodexSync`** now includes `telemetryRecorder` for console inspection.
+
 ## 0.4.0 — Capture Modes & Payload Sanitization
 
 **New setting: `captureMode`** — `minimal` / `standard` (default) / `full_snapshot`

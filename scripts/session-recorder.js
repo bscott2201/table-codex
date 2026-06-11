@@ -2,6 +2,7 @@ import { MODULE_ID, getSetting, setSetting, getPrivacySettings } from "./setting
 import { log, debug } from "./logger.js";
 import { getWorldInfo } from "./world-info.js";
 import { saveUnsyncedSession } from "./session-store.js";
+import { telemetryRecorder } from "./telemetry-recorder.js";
 
 console.log("[TableCodex Sync] session-recorder.js evaluated");
 
@@ -82,6 +83,9 @@ export const sessionRecorder = {
     await _persist();
     _captureOpeningSnapshots();
 
+    // Start the rich telemetry recorder in parallel
+    telemetryRecorder.startSession(_session.localSessionId);
+
     log("Session started: " + _session.localSessionId + " (mode: " + (getSetting("captureMode") || "standard") + ")");
     Hooks.callAll(MODULE_ID + ".sessionStarted", _session);
     ui.notifications.info(game.i18n.localize("TABLECODEX.Session.Started"));
@@ -97,6 +101,9 @@ export const sessionRecorder = {
     _captureClosingSnapshots();
     _session.active  = false;
     _session.endedAt = new Date().toISOString();
+
+    // Stop the telemetry recorder before persisting
+    telemetryRecorder.endSession();
 
     await _persist();
     log("Session ended: " + _session.localSessionId);
@@ -347,6 +354,9 @@ export const sessionRecorder = {
 
       settings: Object.assign({}, privacy, { captureMode }),
       summary,
+      // Rich structured telemetry events (primary data source)
+      telemetryEvents: telemetryRecorder.getEvents(),
+      // Legacy arrays (kept for backwards compatibility and manual export)
       events:       _events,
       chatMessages: _chatMessages,
       rolls:        _rolls,

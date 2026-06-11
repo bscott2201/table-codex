@@ -10,6 +10,32 @@ import { normalizeChat, normalizeCombatEvent, normalizeSceneView, normalizeActor
 import { openPanel, refreshPanel, injectSceneControls, openUnsyncedDialog } from "./ui.js";
 import { apiClient } from "./api-client.js";
 import { getPendingSessions } from "./session-store.js";
+import {
+  telemetryRecorder,
+  onPreUpdateActor,
+  onUpdateActor,
+  onPreUpdateToken,
+  onUpdateToken,
+  onTargetToken,
+  onCreateChatMessage as onTelemetryChatMessage,
+  onCreateCombat,
+  onUpdateCombat,
+  onDeleteCombat,
+  onUpdateCombatant,
+  onCreateActiveEffect,
+  onUpdateActiveEffect,
+  onDeleteActiveEffect,
+  onCreateItem       as onTelemetryCreateItem,
+  onUpdateItem       as onTelemetryUpdateItem,
+  onDeleteItem       as onTelemetryDeleteItem,
+  onCanvasReadyTelemetry,
+  onUpdateScene,
+  onCreateMeasuredTemplate,
+  onCreateJournalEntryTelemetry,
+  onUpdateJournalEntryTelemetry,
+  onCreatePlaylistSound,
+  onUpdatePlaylistSound,
+} from "./telemetry-recorder.js";
 
 // Expose a placeholder immediately so the console helper works even before ready.
 globalThis.TableCodexSync = {
@@ -76,6 +102,16 @@ Hooks.once("init", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Pre-update hooks — MUST be at module scope (not inside ready) so the
+// "before" snapshot is captured even on the very first actor/token update.
+// These run regardless of session state; event emission is gated internally.
+// ---------------------------------------------------------------------------
+
+Hooks.on("preUpdateActor", onPreUpdateActor);
+Hooks.on("preUpdateToken", onPreUpdateToken);
+Hooks.on("targetToken",    onTargetToken);
+
+// ---------------------------------------------------------------------------
 // Scene controls — hook must be registered at module scope, not inside ready
 // ---------------------------------------------------------------------------
 
@@ -123,6 +159,7 @@ async function _initializeOnReady() {
     refreshPanel,
     openUnsyncedDialog,
     sessionRecorder,
+    telemetryRecorder,
     apiClient,
     getSetting,
     setSetting,
@@ -178,6 +215,29 @@ async function _initializeOnReady() {
 // ---------------------------------------------------------------------------
 
 function _registerCaptureHooks() {
+  // ── Telemetry hooks (rich structured events) ──────────────────────────────
+  Hooks.on("createChatMessage",    (m, o, u)    => onTelemetryChatMessage(m, o, u));
+  Hooks.on("updateActor",          (a, c, o, u) => onUpdateActor(a, c, o, u));
+  Hooks.on("updateToken",          (t, c, o, u) => onUpdateToken(t, c, o, u));
+  Hooks.on("createCombat",         (c, o, u)    => onCreateCombat(c, o, u));
+  Hooks.on("updateCombat",         (c, ch, o, u)=> onUpdateCombat(c, ch, o, u));
+  Hooks.on("deleteCombat",         (c, o, u)    => onDeleteCombat(c, o, u));
+  Hooks.on("updateCombatant",      (c, ch, o, u)=> onUpdateCombatant(c, ch, o, u));
+  Hooks.on("createActiveEffect",   (e, o, u)    => onCreateActiveEffect(e, o, u));
+  Hooks.on("updateActiveEffect",   (e, c, o, u) => onUpdateActiveEffect(e, c, o, u));
+  Hooks.on("deleteActiveEffect",   (e, o, u)    => onDeleteActiveEffect(e, o, u));
+  Hooks.on("createItem",           (i, o, u)    => onTelemetryCreateItem(i, o, u));
+  Hooks.on("updateItem",           (i, c, o, u) => onTelemetryUpdateItem(i, c, o, u));
+  Hooks.on("deleteItem",           (i, o, u)    => onTelemetryDeleteItem(i, o, u));
+  Hooks.on("canvasReady",          (cv)         => onCanvasReadyTelemetry(cv));
+  Hooks.on("updateScene",          (s, c, o, u) => onUpdateScene(s, c, o, u));
+  Hooks.on("createMeasuredTemplate",(t, o, u)   => onCreateMeasuredTemplate(t, o, u));
+  Hooks.on("createJournalEntry",   (j, o, u)    => onCreateJournalEntryTelemetry(j, o, u));
+  Hooks.on("updateJournalEntry",   (j, c, o, u) => onUpdateJournalEntryTelemetry(j, c, o, u));
+  Hooks.on("createPlaylistSound",  (s, o, u)    => onCreatePlaylistSound(s, o, u));
+  Hooks.on("updatePlaylistSound",  (s, c, o, u) => onUpdatePlaylistSound(s, c, o, u));
+
+  // ── Legacy capture hooks (keep legacy arrays for backwards compat) ─────────
   Hooks.on("createChatMessage", (message) => {
     if (!sessionRecorder.isActive) return;
     const data = normalizeChat(message);

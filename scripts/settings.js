@@ -1,7 +1,7 @@
 export const MODULE_ID = "tablecodex-sync";
 export const MODULE_TITLE = "TableCodex Sync";
 export const SCHEMA_VERSION = "1.0.0";
-export const MODULE_VERSION = "0.4.0";
+export const MODULE_VERSION = "0.5.0";
 
 console.log("[TableCodex Sync] settings.js evaluated");
 
@@ -137,6 +137,62 @@ export function registerSettings() {
     type: Boolean,
     default: true,
     restricted: true,
+  });
+
+  // --- Telemetry capture toggles ---
+
+  S.register(m, "captureChat", {
+    name: "TABLECODEX.Settings.CaptureChat.Name",
+    hint: "TABLECODEX.Settings.CaptureChat.Hint",
+    scope: "world", config: true, type: Boolean, default: true, restricted: true,
+  });
+
+  S.register(m, "captureCombat", {
+    name: "TABLECODEX.Settings.CaptureCombat.Name",
+    hint: "TABLECODEX.Settings.CaptureCombat.Hint",
+    scope: "world", config: true, type: Boolean, default: true, restricted: true,
+  });
+
+  S.register(m, "captureActorUpdates", {
+    name: "TABLECODEX.Settings.CaptureActorUpdates.Name",
+    hint: "TABLECODEX.Settings.CaptureActorUpdates.Hint",
+    scope: "world", config: true, type: Boolean, default: true, restricted: true,
+  });
+
+  S.register(m, "captureTokenMovement", {
+    name: "TABLECODEX.Settings.CaptureTokenMovement.Name",
+    hint: "TABLECODEX.Settings.CaptureTokenMovement.Hint",
+    scope: "world", config: true, type: Boolean, default: true, restricted: true,
+  });
+
+  S.register(m, "captureConditions", {
+    name: "TABLECODEX.Settings.CaptureConditions.Name",
+    hint: "TABLECODEX.Settings.CaptureConditions.Hint",
+    scope: "world", config: true, type: Boolean, default: true, restricted: true,
+  });
+
+  S.register(m, "captureJournals", {
+    name: "TABLECODEX.Settings.CaptureJournals.Name",
+    hint: "TABLECODEX.Settings.CaptureJournals.Hint",
+    scope: "world", config: true, type: Boolean, default: true, restricted: true,
+  });
+
+  S.register(m, "capturePlaylists", {
+    name: "TABLECODEX.Settings.CapturePlaylists.Name",
+    hint: "TABLECODEX.Settings.CapturePlaylists.Hint",
+    scope: "world", config: true, type: Boolean, default: false, restricted: true,
+  });
+
+  S.register(m, "includeRawPayloads", {
+    name: "TABLECODEX.Settings.IncludeRawPayloads.Name",
+    hint: "TABLECODEX.Settings.IncludeRawPayloads.Hint",
+    scope: "world", config: true, type: Boolean, default: false, restricted: true,
+  });
+
+  S.register(m, "telemetryQueueMaxSize", {
+    name: "TABLECODEX.Settings.TelemetryQueueMaxSize.Name",
+    hint: "TABLECODEX.Settings.TelemetryQueueMaxSize.Hint",
+    scope: "world", config: true, type: Number, default: 2000, restricted: true,
   });
 
   S.register(m, "autoSyncOnSessionEnd", {
