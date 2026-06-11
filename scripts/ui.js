@@ -280,34 +280,38 @@ export function injectSceneControls(controls) {
 
   if (!tokenGroup?.tools) return;
 
+  const _toggleSession = async () => {
+    if (sessionRecorder.isActive) {
+      await sessionRecorder.stop();
+    } else {
+      if (!(getSetting("selectedCampaignId") ?? "").trim()) {
+        ui.notifications.warn(game.i18n.localize("TABLECODEX.Warn.NoCampaignForSession"));
+      }
+      const title = await _promptSessionTitle();
+      if (title === null) return;
+      await sessionRecorder.start({ sessionTitle: title });
+    }
+    ui.controls?.render();
+  };
+
   const panelTool = {
     name:     "tablecodex-panel",
     title:    "TableCodex Sync",
     icon:     "fas fa-scroll",
     button:   true,
-    onChange: () => openPanel(),
+    onClick:  () => openPanel(),  // V14
+    onChange: () => openPanel(),  // V13 fallback
   };
 
   const sessionTool = {
-    name:   "tablecodex-session",
-    title:  isActive
+    name:     "tablecodex-session",
+    title:    isActive
       ? game.i18n.localize("TABLECODEX.Controls.StopSession")
       : game.i18n.localize("TABLECODEX.Controls.StartSession"),
-    icon:   isActive ? "fas fa-stop-circle" : "fas fa-circle",
-    button: true,
-    onChange: async () => {
-      if (sessionRecorder.isActive) {
-        await sessionRecorder.stop();
-      } else {
-        if (!(getSetting("selectedCampaignId") ?? "").trim()) {
-          ui.notifications.warn(game.i18n.localize("TABLECODEX.Warn.NoCampaignForSession"));
-        }
-        const title = await _promptSessionTitle();
-        if (title === null) return;
-        await sessionRecorder.start({ sessionTitle: title });
-      }
-      ui.controls?.render();
-    },
+    icon:     isActive ? "fas fa-stop-circle" : "fas fa-circle",
+    button:   true,
+    onClick:  _toggleSession,  // V14
+    onChange: _toggleSession,  // V13 fallback
   };
 
   if (Array.isArray(tokenGroup.tools)) {

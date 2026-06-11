@@ -2,7 +2,7 @@
   "id": "tablecodex-sync",
   "title": "TableCodex Sync",
   "description": "Capture Foundry session activity and export/sync to TableCodex.",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "authors": [
     {
       "name": "TableCodex"

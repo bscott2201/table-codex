@@ -15,7 +15,27 @@ Hooks.once("init", () => {
 
   Handlebars.registerHelper("eq", (a, b) => a === b);
   Handlebars.registerHelper("gt", (a, b) => a > b);
+
+  // Settings menu button — the most reliable UI entry point.
+  // Appears in Game Settings → Module Settings → TableCodex Sync → "Open Panel".
+  game.settings.registerMenu(MODULE_ID, "openPanel", {
+    name:       "TableCodex Sync Panel",
+    label:      "Open Panel",
+    hint:       "Open the TableCodex session capture, campaign link, and sync panel.",
+    icon:       "fas fa-scroll",
+    type:       _PanelLauncher,
+    restricted: true,
+  });
 });
+
+// Minimal FormApplication shim that just opens the real panel.
+class _PanelLauncher extends FormApplication {
+  static get defaultOptions() {
+    return foundry.utils.mergeObject(super.defaultOptions, { title: "TableCodex Sync" });
+  }
+  async _updateObject() {}
+  render() { openPanel(); return this; }
+}
 
 // ---------------------------------------------------------------------------
 // Ready

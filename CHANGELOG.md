@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1 — UI Entry Points Fix
+
+- **Settings menu restored**: `game.settings.registerMenu` now adds an "Open Panel" button under Game Settings → Module Settings → TableCodex Sync — the most reliable entry point, works even if canvas hooks fail
+- **Canvas toolbar fixed**: scene control button callbacks changed from `onChange` (toggle hook) to `onClick` (button hook) for Foundry V14; both `onClick` and `onChange` are set for V13/V14 compatibility
+- Extracted `_toggleSession` named function to avoid duplicating the start/stop logic for both callback properties
+
 ## 0.3.0 — Unsynced Session Recovery
 
 **New file: `scripts/session-store.js`** — persistent CRUD store for unsynced session records. Each record contains display metadata + the full `normalizedPayload` so retry/force-sync works after a Foundry reload.
