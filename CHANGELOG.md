@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.2 — UI Visibility Fix
+
+- **Root cause fixed**: `type: Array` is not a valid Foundry setting type — changed to `type: Object` with `{ sessions: [] }` wrapper. This was silently crashing `registerSettings()`, which prevented ALL hooks from running (no canvas buttons, no settings menu)
+- **`FormApplication` shim removed**: The `_PanelLauncher extends FormApplication` approach was unreliable in V14 where `FormApplication` is deprecated
+- **`renderSettings` hook added**: Injects an "Open TableCodex Sync" button directly into Foundry's Game Settings sidebar — no class inheritance required, works in all V13/V14 builds
+- **`console.error` added around `registerSettings()`**: Init will now log exactly where it fails instead of dying silently
+- **`session-store.js`**: All write helpers now use `_saveAll({ sessions: arr })` consistently; `getUnsyncedSessions()` handles both the new wrapper format and legacy plain-array format
+
 ## 0.3.1 — UI Entry Points Fix
 
 - **Settings menu restored**: `game.settings.registerMenu` now adds an "Open Panel" button under Game Settings → Module Settings → TableCodex Sync — the most reliable entry point, works even if canvas hooks fail

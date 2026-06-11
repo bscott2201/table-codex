@@ -1,5 +1,29 @@
 /* TableCodex Sync — Module Styles */
 
+/* ── Settings sidebar button ───────────────────────────────────────────── */
+.tc-settings-btn-wrap {
+  padding: 4px 0;
+}
+
+.tc-settings-btn {
+  width: 100%;
+  background: #1a3a6e;
+  border: 1px solid #2980b9;
+  color: #fff;
+  padding: 6px 10px;
+  font-size: 0.85rem;
+  border-radius: 3px;
+  cursor: pointer;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tc-settings-btn:hover {
+  background: #204a8a;
+}
+
 /* ── Panel wrapper ─────────────────────────────────────────────────────── */
 .tablecodex-panel-wrap {
   display: flex;

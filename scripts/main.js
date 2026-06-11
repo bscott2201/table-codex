@@ -10,32 +10,42 @@ import { getPendingSessions } from "./session-store.js";
 // ---------------------------------------------------------------------------
 
 Hooks.once("init", () => {
-  log(`Initializing ${MODULE_TITLE}`);
-  registerSettings();
+  console.log(`[TableCodex Sync] init — loading module`);
+
+  try {
+    registerSettings();
+    console.log("[TableCodex Sync] settings registered OK");
+  } catch (err) {
+    console.error("[TableCodex Sync] registerSettings() FAILED:", err);
+  }
 
   Handlebars.registerHelper("eq", (a, b) => a === b);
   Handlebars.registerHelper("gt", (a, b) => a > b);
-
-  // Settings menu button — the most reliable UI entry point.
-  // Appears in Game Settings → Module Settings → TableCodex Sync → "Open Panel".
-  game.settings.registerMenu(MODULE_ID, "openPanel", {
-    name:       "TableCodex Sync Panel",
-    label:      "Open Panel",
-    hint:       "Open the TableCodex session capture, campaign link, and sync panel.",
-    icon:       "fas fa-scroll",
-    type:       _PanelLauncher,
-    restricted: true,
-  });
 });
 
-// Minimal FormApplication shim that just opens the real panel.
-class _PanelLauncher extends FormApplication {
-  static get defaultOptions() {
-    return foundry.utils.mergeObject(super.defaultOptions, { title: "TableCodex Sync" });
+// Inject an "Open TableCodex" button directly into the settings sidebar.
+// This approach requires no FormApplication subclass and works in all V13/V14 builds.
+Hooks.on("renderSettings", (_app, html) => {
+  if (!game.user?.isGM) return;
+  if (html.find(".tc-settings-btn").length) return; // already injected
+
+  const btn = $(`
+    <div class="tc-settings-btn-wrap">
+      <button type="button" class="tc-settings-btn">
+        <i class="fas fa-scroll"></i> Open TableCodex Sync
+      </button>
+    </div>
+  `);
+  btn.find("button").on("click", () => openPanel());
+
+  // Insert after the "Game Settings" heading or at the top of the settings list
+  const target = html.find("#settings-game, .settings-list").first();
+  if (target.length) {
+    target.before(btn);
+  } else {
+    html.prepend(btn);
   }
-  async _updateObject() {}
-  render() { openPanel(); return this; }
-}
+});
 
 // ---------------------------------------------------------------------------
 // Ready

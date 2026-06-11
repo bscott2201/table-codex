@@ -2,6 +2,9 @@
  * Persistent storage for unsynced session records.
  * Each record holds the full normalizedPayload so retry/force-sync can work
  * after a Foundry reload without any in-memory state.
+ *
+ * Storage note: Foundry settings do not accept Array as a type.
+ * We use type:Object and wrap the array as { sessions: [...] }.
  */
 
 import { getSetting, setSetting } from "./settings.js";
@@ -15,10 +18,11 @@ const KEY = "unsyncedSessions";
 
 export function getUnsyncedSessions() {
   const raw = getSetting(KEY);
-  return Array.isArray(raw) ? raw : [];
+  if (Array.isArray(raw)) return raw;                    // legacy plain-array
+  if (raw && Array.isArray(raw.sessions)) return raw.sessions;
+  return [];
 }
 
-// Sessions the GM still needs to act on.
 export function getPendingSessions() {
   return getUnsyncedSessions().filter(
     (s) => s.status === "unsynced" || s.status === "sync_failed" || s.status === "sync_pending"
@@ -44,7 +48,7 @@ export async function saveUnsyncedSession(record) {
     all.push(record);
   }
 
-  await setSetting(KEY, all);
+  await _saveAll(all);
   debug(`Session store: saved ${record.localSessionId} (status: ${record.status ?? "?"})`);
 }
 
@@ -69,11 +73,11 @@ export async function markSessionFailed(localSessionId, error) {
     log(`markSessionFailed: ${localSessionId} not found — skipping.`);
     return;
   }
-  rec.status          = "sync_failed";
-  rec.lastSyncAttemptAt = new Date().toISOString();
-  rec.lastSyncError   = typeof error === "string" ? error : (error?.message ?? String(error));
-  rec.attemptCount    = (rec.attemptCount ?? 0) + 1;
-  await setSetting(KEY, all);
+  rec.status             = "sync_failed";
+  rec.lastSyncAttemptAt  = new Date().toISOString();
+  rec.lastSyncError      = typeof error === "string" ? error : (error?.message ?? String(error));
+  rec.attemptCount       = (rec.attemptCount ?? 0) + 1;
+  await _saveAll(all);
   log(`Session store: ${localSessionId} → sync_failed (attempt ${rec.attemptCount}): ${rec.lastSyncError}`);
 }
 
@@ -82,8 +86,6 @@ export async function archiveSession(localSessionId) {
   log(`Session store: ${localSessionId} → archived`);
 }
 
-// Overwrite the stored normalizedPayload for an existing record.
-// Used when force-sync rebuilds the payload with injected fields.
 export async function updateSessionPayload(localSessionId, normalizedPayload) {
   await _update(localSessionId, { normalizedPayload });
 }
@@ -92,10 +94,14 @@ export async function updateSessionPayload(localSessionId, normalizedPayload) {
 // Internal
 // ---------------------------------------------------------------------------
 
+async function _saveAll(arr) {
+  await setSetting(KEY, { sessions: arr });
+}
+
 async function _update(localSessionId, patch) {
   const all = getUnsyncedSessions();
   const idx = all.findIndex((s) => s.localSessionId === localSessionId);
   if (idx < 0) return;
   all[idx] = { ...all[idx], ...patch };
-  await setSetting(KEY, all);
+  await _saveAll(all);
 }

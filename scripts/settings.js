@@ -1,7 +1,7 @@
 export const MODULE_ID = "tablecodex-sync";
 export const MODULE_TITLE = "TableCodex Sync";
 export const SCHEMA_VERSION = "1.0.0";
-export const MODULE_VERSION = "0.3.1";
+export const MODULE_VERSION = "0.3.2";
 
 export function registerSettings() {
   const S = game.settings;
@@ -149,11 +149,12 @@ export function registerSettings() {
 
   // Persistent list of unsynced session records.
   // Each entry holds display metadata + normalizedPayload for retry.
+  // Stored as Object (Foundry does not accept Array as a setting type).
   S.register(m, "unsyncedSessions", {
     scope: "world",
     config: false,
-    type: Array,
-    default: [],
+    type: Object,
+    default: {},
   });
 
   S.register(m, "selectedCampaignId", {
