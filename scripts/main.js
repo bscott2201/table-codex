@@ -2,7 +2,7 @@ import { MODULE_ID, MODULE_TITLE, MODULE_VERSION, registerSettings, getSetting, 
 import { log, debug } from "./logger.js";
 import { sessionRecorder } from "./session-recorder.js";
 import { normalizeChat, normalizeCombatEvent, normalizeSceneView, normalizeActorEvent, normalizeItemEvent, normalizeJournalEvent } from "./event-normalizer.js";
-import { openPanel, refreshPanel, injectSceneControls } from "./ui.js";
+import { openPanel, refreshPanel, injectSceneControls, openUnsyncedDialog } from "./ui.js";
 import { apiClient } from "./api-client.js";
 import { getPendingSessions } from "./session-store.js";
 
@@ -83,11 +83,21 @@ Hooks.once("ready", async () => {
   console.log("World title:", game.world?.title);
   console.log("Is GM:", game.user?.isGM);
   console.log("Settings registered:", game.settings.settings?.has?.(`${MODULE_ID}.tablecodexApiUrl`) ?? "unknown");
-  console.log("Template base: ", `modules/${MODULE_ID}/templates/session-panel.hbs`);
+  console.log("Module URL:", game.modules.get(MODULE_ID)?.url ?? "(not found — check folder name)");
+  console.log("Module active:", game.modules.get(MODULE_ID)?.active ?? false);
+  console.log("Template path:", `modules/${MODULE_ID}/templates/session-panel.hbs`);
   console.groupEnd();
 
   // Expose a global for console testing
-  window.TableCodexSync = { openPanel, refreshPanel, sessionRecorder, apiClient };
+  window.TableCodexSync = {
+    openPanel,
+    refreshPanel,
+    openUnsyncedDialog,
+    sessionRecorder,
+    apiClient,
+    getSetting,
+    setSetting,
+  };
   console.log(`[${MODULE_TITLE}] window.TableCodexSync available — try TableCodexSync.openPanel()`);
 
   // Store world info for payload use
@@ -125,9 +135,9 @@ Hooks.once("ready", async () => {
     }
   }
 
-  // Force scene controls to render so toolbar buttons appear immediately
+  // Force scene controls to render so toolbar buttons appear without a scene reload
   if (game.user?.isGM) {
-    ui.controls?.render?.();
+    ui.controls?.render?.(true);
   }
 
   _registerCaptureHooks();

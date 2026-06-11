@@ -273,13 +273,21 @@ export function refreshUnsyncedDialog() {
 export function injectSceneControls(controls) {
   if (!game.user?.isGM) return;
 
-  const isActive  = sessionRecorder.isActive;
-  const isArray   = Array.isArray(controls);
-  const hasV14Obj = !isArray && !!controls?.tokens?.tools;
+  const isActive = sessionRecorder.isActive;
+  const isArray  = Array.isArray(controls);
+
+  // Resolve the token control group — try both V14 key names
+  const tokenControls = !isArray
+    ? (controls?.tokens ?? controls?.token ?? null)
+    : null;
 
   console.debug(
-    `[TableCodex Sync] injectSceneControls — shape: ${isArray ? "array (V13)" : "object (V14)"}`,
-    hasV14Obj ? `token tool keys: ${Object.keys(controls.tokens.tools).join(", ")}` : "(no tokens.tools)"
+    `[TableCodex Sync] injectSceneControls`,
+    `| isGM: ${game.user?.isGM}`,
+    `| shape: ${isArray ? "array(V13)" : "object(V14)"}`,
+    `| controlsKeys: ${isArray ? controls.length + " items" : Object.keys(controls ?? {}).join(", ")}`,
+    `| tokenControls: ${!!tokenControls}`,
+    `| tools: ${tokenControls?.tools ? Object.keys(tokenControls.tools).join(", ") : "none"}`
   );
 
   const _toggleSession = async () => {
@@ -297,36 +305,61 @@ export function injectSceneControls(controls) {
   };
 
   // ── Foundry V14: object-keyed controls ──────────────────────────────────
-  if (hasV14Obj) {
-    const n = Object.keys(controls.tokens.tools).length;
-    controls.tokens.tools["tablecodex-panel"] = {
+  if (!isArray && tokenControls?.tools) {
+    const n = Object.keys(tokenControls.tools).length;
+
+    tokenControls.tools["tablecodex-panel"] = {
       name:     "tablecodex-panel",
       title:    "TableCodex Sync",
       icon:     "fa-solid fa-scroll",
-      order:    n + 100,
+      order:    999,
       button:   true,
-      visible:  true,
+      visible:  game.user?.isGM ?? false,
       onChange: () => openPanel(),
+      onClick:  () => openPanel(),
     };
-    controls.tokens.tools["tablecodex-session"] = {
+    tokenControls.tools["tablecodex-session"] = {
       name:     "tablecodex-session",
       title:    isActive ? "Stop TableCodex Session" : "Start TableCodex Session",
       icon:     isActive ? "fa-solid fa-stop-circle" : "fa-regular fa-circle",
-      order:    n + 101,
+      order:    1000,
       button:   true,
-      visible:  true,
+      visible:  game.user?.isGM ?? false,
       onChange: _toggleSession,
+      onClick:  _toggleSession,
     };
+
+    console.debug(
+      `[TableCodex Sync] V14 tools injected, keys now:`,
+      Object.keys(tokenControls.tools).join(", ")
+    );
     return;
   }
 
   // ── Foundry V13 fallback: array controls ─────────────────────────────────
   if (isArray) {
     const tokenGroup = controls.find((c) => c.name === "token" || c.name === "tokens");
-    if (!tokenGroup?.tools) return;
+    if (!tokenGroup?.tools) {
+      console.warn("[TableCodex Sync] V13 array mode: no token group found");
+      return;
+    }
     tokenGroup.tools.push(
-      { name: "tablecodex-panel",  title: "TableCodex Sync",         icon: "fas fa-scroll",       button: true, onClick: () => openPanel(), onChange: () => openPanel() },
-      { name: "tablecodex-session", title: isActive ? "Stop TableCodex Session" : "Start TableCodex Session", icon: isActive ? "fas fa-stop-circle" : "fas fa-circle", button: true, onClick: _toggleSession, onChange: _toggleSession }
+      {
+        name:     "tablecodex-panel",
+        title:    "TableCodex Sync",
+        icon:     "fas fa-scroll",
+        button:   true,
+        onClick:  () => openPanel(),
+        onChange: () => openPanel(),
+      },
+      {
+        name:     "tablecodex-session",
+        title:    isActive ? "Stop TableCodex Session" : "Start TableCodex Session",
+        icon:     isActive ? "fas fa-stop-circle" : "fas fa-circle",
+        button:   true,
+        onClick:  _toggleSession,
+        onChange: _toggleSession,
+      }
     );
     return;
   }

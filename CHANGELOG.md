@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.4 — UI Hardening Pass
+
+- `window.TableCodexSync` now includes `openUnsyncedDialog`, `getSetting`, `setSetting` in addition to `openPanel`, `refreshPanel`, `sessionRecorder`, `apiClient`
+- `ui.controls?.render?.(true)` — passes `true` to force a full re-render of the toolbar on `ready`
+- `injectSceneControls`: resolves token group as `controls.tokens ?? controls.token` to handle both V14 key names; sets `order: 999/1000` and `visible: game.user.isGM`; sets both `onChange` and `onClick` on all tools; expanded debug logging shows isGM, controls shape, key list before and after injection
+- Startup diagnostics: logs `game.modules.get(MODULE_ID).url` and `.active` to confirm folder name matches module ID
+
 ## 0.3.3 — V14 UI Reliability
 
 - **`registerMenu`**: Proper `TableCodexPanelMenuShim extends FormApplication` defined at module scope in `main.js`. Opens the TableCodex panel when the settings menu button is clicked. Button appears under Configure Settings → Module Settings → TableCodex Sync → "Open TableCodex Sync".
