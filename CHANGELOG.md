@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.3 — V14 UI Reliability
+
+- **`registerMenu`**: Proper `TableCodexPanelMenuShim extends FormApplication` defined at module scope in `main.js`. Opens the TableCodex panel when the settings menu button is clicked. Button appears under Configure Settings → Module Settings → TableCodex Sync → "Open TableCodex Sync".
+- **`renderSettings` hook removed**: No longer relies on DOM injection into `#settings-game` / `.settings-list`.
+- **`injectSceneControls` V14 rewrite**: Detects V14 object-keyed controls (`controls.tokens.tools`) vs V13 array separately. V14 path sets `order`, `visible`, `onChange` exactly per V14 API. V13 path sets `onClick` + `onChange`. Logs the controls shape to console on every call for easy diagnosis.
+- **Template paths**: Both `TableCodexPanel` and `UnsyncedSessionsDialog` now use `` `modules/${MODULE_ID}/templates/...` `` instead of the hardcoded string, so they survive any folder-name mismatch.
+- **`window.TableCodexSync`**: Exposed on `ready` — `TableCodexSync.openPanel()` works from the browser console.
+- **Startup diagnostics**: Full `console.group` on `ready` showing module id, version, Foundry version, system, world id, GM status, and settings registration state.
+- **`ui.controls?.render()`**: Called at end of `ready` (GM only) to force toolbar repaint so buttons appear without a manual scene reload.
+- **`apiClient` import**: Added to `main.js` imports so it's included in the `window.TableCodexSync` global.
+
 ## 0.3.2 — UI Visibility Fix
 
 - **Root cause fixed**: `type: Array` is not a valid Foundry setting type — changed to `type: Object` with `{ sessions: [] }` wrapper. This was silently crashing `registerSettings()`, which prevented ALL hooks from running (no canvas buttons, no settings menu)

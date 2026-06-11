@@ -1,66 +1,102 @@
-import { MODULE_ID, MODULE_TITLE, registerSettings, getSetting, setSetting } from "./settings.js";
+import { MODULE_ID, MODULE_TITLE, MODULE_VERSION, registerSettings, getSetting, setSetting } from "./settings.js";
 import { log, debug } from "./logger.js";
 import { sessionRecorder } from "./session-recorder.js";
 import { normalizeChat, normalizeCombatEvent, normalizeSceneView, normalizeActorEvent, normalizeItemEvent, normalizeJournalEvent } from "./event-normalizer.js";
-import { openPanel, refreshPanel, injectSceneControls, openUnsyncedDialog } from "./ui.js";
+import { openPanel, refreshPanel, injectSceneControls } from "./ui.js";
+import { apiClient } from "./api-client.js";
 import { getPendingSessions } from "./session-store.js";
+
+// ---------------------------------------------------------------------------
+// FormApplication shim for the settings menu button.
+// Foundry's registerMenu requires a FormApplication subclass.
+// We override render() to open the real panel instead of rendering a form.
+// Defined at module scope so it exists by the time init fires.
+// ---------------------------------------------------------------------------
+
+class TableCodexPanelMenuShim extends FormApplication {
+  static get defaultOptions() {
+    return foundry.utils.mergeObject(super.defaultOptions, {
+      title: MODULE_TITLE,
+      id:    "tablecodex-panel-launcher",
+    });
+  }
+  async _updateObject() {}
+  render(_force, _options) {
+    openPanel();
+    return this;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Init
 // ---------------------------------------------------------------------------
 
 Hooks.once("init", () => {
-  console.log(`[TableCodex Sync] init — loading module`);
+  console.log(`[${MODULE_TITLE}] init`);
 
   try {
     registerSettings();
-    console.log("[TableCodex Sync] settings registered OK");
+    console.log(`[${MODULE_TITLE}] settings registered`);
   } catch (err) {
-    console.error("[TableCodex Sync] registerSettings() FAILED:", err);
+    console.error(`[${MODULE_TITLE}] registerSettings() failed:`, err);
   }
 
   Handlebars.registerHelper("eq", (a, b) => a === b);
   Handlebars.registerHelper("gt", (a, b) => a > b);
-});
 
-// Inject an "Open TableCodex" button directly into the settings sidebar.
-// This approach requires no FormApplication subclass and works in all V13/V14 builds.
-Hooks.on("renderSettings", (_app, html) => {
-  if (!game.user?.isGM) return;
-  if (html.find(".tc-settings-btn").length) return; // already injected
-
-  const btn = $(`
-    <div class="tc-settings-btn-wrap">
-      <button type="button" class="tc-settings-btn">
-        <i class="fas fa-scroll"></i> Open TableCodex Sync
-      </button>
-    </div>
-  `);
-  btn.find("button").on("click", () => openPanel());
-
-  // Insert after the "Game Settings" heading or at the top of the settings list
-  const target = html.find("#settings-game, .settings-list").first();
-  if (target.length) {
-    target.before(btn);
-  } else {
-    html.prepend(btn);
+  // Register the settings menu button.
+  // Shows as "Open TableCodex Sync" under Configure Settings → Module Settings → TableCodex Sync.
+  try {
+    game.settings.registerMenu(MODULE_ID, "openPanel", {
+      name:       "TableCodex Sync Panel",
+      label:      "Open TableCodex Sync",
+      hint:       "Open the TableCodex Sync panel for API connection, campaign selection, session capture, export, and sync.",
+      icon:       "fa-solid fa-scroll",
+      type:       TableCodexPanelMenuShim,
+      restricted: true,
+    });
+    console.log(`[${MODULE_TITLE}] registerMenu OK`);
+  } catch (err) {
+    console.error(`[${MODULE_TITLE}] registerMenu() failed:`, err);
   }
 });
+
+// ---------------------------------------------------------------------------
+// Scene controls — registered before ready so they appear on first load
+// ---------------------------------------------------------------------------
+
+Hooks.on("getSceneControlButtons", injectSceneControls);
 
 // ---------------------------------------------------------------------------
 // Ready
 // ---------------------------------------------------------------------------
 
 Hooks.once("ready", async () => {
-  log("Ready.");
+  // Startup diagnostics — always visible in console
+  const modVersion = game.modules.get(MODULE_ID)?.version ?? MODULE_VERSION;
+  console.group(`[${MODULE_TITLE}] Startup Diagnostics`);
+  console.log("Module ID:", MODULE_ID);
+  console.log("Module version:", modVersion);
+  console.log("Foundry version:", game.version);
+  console.log("System:", game.system?.id);
+  console.log("World ID:", game.world?.id);
+  console.log("World title:", game.world?.title);
+  console.log("Is GM:", game.user?.isGM);
+  console.log("Settings registered:", game.settings.settings?.has?.(`${MODULE_ID}.tablecodexApiUrl`) ?? "unknown");
+  console.log("Template base: ", `modules/${MODULE_ID}/templates/session-panel.hbs`);
+  console.groupEnd();
 
-  // Store world info in settings for payload use
+  // Expose a global for console testing
+  window.TableCodexSync = { openPanel, refreshPanel, sessionRecorder, apiClient };
+  console.log(`[${MODULE_TITLE}] window.TableCodexSync available — try TableCodexSync.openPanel()`);
+
+  // Store world info for payload use
   try {
-    await setSetting("foundryWorldId", game.world?.id ?? "");
+    await setSetting("foundryWorldId",   game.world?.id    ?? "");
     await setSetting("foundryWorldName", game.world?.title ?? "");
   } catch { /* ignore */ }
 
-  // GM-only: check for an active session that survived a page reload
+  // GM-only: resume or warn about surviving sessions
   if (game.user?.isGM) {
     const buf = getSetting("localSessionBuffer");
     if (buf?.session?.active) {
@@ -71,53 +107,46 @@ Hooks.once("ready", async () => {
     }
   }
 
-  // Subscribe to session events to keep UI in sync
+  // Subscribe to session lifecycle events
   Hooks.on(`${MODULE_ID}.sessionStarted`, refreshPanel);
   Hooks.on(`${MODULE_ID}.sessionStopped`, refreshPanel);
   Hooks.on(`${MODULE_ID}.bufferCleared`,  refreshPanel);
 
-  // Warn GM about any sessions that need attention
+  // Warn about pending unsynced sessions
   if (game.user?.isGM) {
     const pending = getPendingSessions();
-    debug(`Unsynced session store: ${pending.length} pending session(s).`);
+    debug(`Session store: ${pending.length} pending session(s).`);
     if (pending.length > 0) {
       const label = pending.length === 1 ? "session" : "sessions";
-      // Show as a persistent warning with a clickable action
       ui.notifications.warn(
         `TableCodex: You have ${pending.length} unsynced ${label}. ` +
-        `Open the TableCodex panel and click "Review Unsynced Sessions" to retry or export.`
+        `Open the TableCodex panel → "Review Unsynced Sessions".`
       );
     }
+  }
+
+  // Force scene controls to render so toolbar buttons appear immediately
+  if (game.user?.isGM) {
+    ui.controls?.render?.();
   }
 
   _registerCaptureHooks();
 });
 
 // ---------------------------------------------------------------------------
-// Scene controls
-// ---------------------------------------------------------------------------
-
-Hooks.on("getSceneControlButtons", injectSceneControls);
-
-// ---------------------------------------------------------------------------
 // Event capture hooks
 // ---------------------------------------------------------------------------
 
 function _registerCaptureHooks() {
-  // --- Chat ---
   Hooks.on("createChatMessage", (message) => {
     if (!sessionRecorder.isActive) return;
     const data = normalizeChat(message);
-    if (!data) return; // filtered by privacy settings
+    if (!data) return;
     sessionRecorder.recordChat(data);
-    // Also record any embedded rolls
-    for (const roll of data.rolls) {
-      sessionRecorder.recordRoll(roll);
-    }
+    for (const roll of data.rolls) sessionRecorder.recordRoll(roll);
     debug("Chat captured:", message.id);
   });
 
-  // --- Combat ---
   Hooks.on("combatStart", (combat) => {
     if (!sessionRecorder.isActive) return;
     const data = normalizeCombatEvent("combat-start", combat);
@@ -130,17 +159,17 @@ function _registerCaptureHooks() {
     if (data) sessionRecorder.recordCombat(data);
   });
 
-  Hooks.on("combatRound", (combat, _updateData, _options) => {
+  Hooks.on("combatRound", (combat, _u, _o) => {
     if (!sessionRecorder.isActive) return;
     const data = normalizeCombatEvent("round-change", combat, { round: combat.round });
     if (data) sessionRecorder.recordCombat(data);
   });
 
-  Hooks.on("combatTurn", (combat, _updateData, _options) => {
+  Hooks.on("combatTurn", (combat, _u, _o) => {
     if (!sessionRecorder.isActive) return;
     const data = normalizeCombatEvent("turn-change", combat, {
       round: combat.round,
-      turn: combat.turn,
+      turn:  combat.turn,
       activeCombatant: combat.combatant
         ? { id: combat.combatant.id, name: combat.combatant.name }
         : null,
@@ -148,7 +177,6 @@ function _registerCaptureHooks() {
     if (data) sessionRecorder.recordCombat(data);
   });
 
-  // --- Scenes ---
   Hooks.on("canvasReady", (canvas) => {
     if (!sessionRecorder.isActive) return;
     const scene = canvas?.scene;
@@ -158,17 +186,14 @@ function _registerCaptureHooks() {
     debug("Scene viewed:", scene.name);
   });
 
-  // --- Actors ---
   Hooks.on("createActor", (actor) => {
-    if (!sessionRecorder.isActive) return;
-    if (!getSetting("captureActorSnapshots")) return;
+    if (!sessionRecorder.isActive || !getSetting("captureActorSnapshots")) return;
     const data = normalizeActorEvent("created", actor);
     if (data) sessionRecorder.recordActor(data);
   });
 
   Hooks.on("updateActor", (actor) => {
-    if (!sessionRecorder.isActive) return;
-    if (!getSetting("captureActorSnapshots")) return;
+    if (!sessionRecorder.isActive || !getSetting("captureActorSnapshots")) return;
     const data = normalizeActorEvent("updated", actor);
     if (data) sessionRecorder.recordActor(data);
   });
@@ -179,17 +204,14 @@ function _registerCaptureHooks() {
     if (data) sessionRecorder.recordActor(data);
   });
 
-  // --- Items ---
   Hooks.on("createItem", (item) => {
-    if (!sessionRecorder.isActive) return;
-    if (!getSetting("captureItemSnapshots")) return;
+    if (!sessionRecorder.isActive || !getSetting("captureItemSnapshots")) return;
     const data = normalizeItemEvent("created", item);
     if (data) sessionRecorder.recordItem(data);
   });
 
   Hooks.on("updateItem", (item) => {
-    if (!sessionRecorder.isActive) return;
-    if (!getSetting("captureItemSnapshots")) return;
+    if (!sessionRecorder.isActive || !getSetting("captureItemSnapshots")) return;
     const data = normalizeItemEvent("updated", item);
     if (data) sessionRecorder.recordItem(data);
   });
@@ -200,7 +222,6 @@ function _registerCaptureHooks() {
     if (data) sessionRecorder.recordItem(data);
   });
 
-  // --- Journals ---
   Hooks.on("renderJournalSheet", (_app, _html, data) => {
     if (!sessionRecorder.isActive) return;
     const journal = data?.document ?? _app?.document;
@@ -215,34 +236,25 @@ function _registerCaptureHooks() {
     if (normalized) sessionRecorder.recordJournal(normalized);
   });
 
-  // --- Tokens (lightweight) ---
   Hooks.on("createToken", (token) => {
     if (!sessionRecorder.isActive) return;
-    debug("Token created:", token.name);
     sessionRecorder.recordScene({
-      subtype: "token-created",
+      subtype:   "token-created",
       timestamp: new Date().toISOString(),
-      sceneId: token.parent?.id ?? token.sceneId ?? null,
-      name: token.parent?.name ?? null,
-      token: {
-        id: token.id,
-        name: token.name,
-        actorId: token.actorId,
-        x: token.x,
-        y: token.y,
-        hidden: token.hidden,
-      },
+      sceneId:   token.parent?.id ?? token.sceneId ?? null,
+      name:      token.parent?.name ?? null,
+      token:     { id: token.id, name: token.name, actorId: token.actorId, x: token.x, y: token.y, hidden: token.hidden },
     });
   });
 
   Hooks.on("deleteToken", (token) => {
     if (!sessionRecorder.isActive) return;
     sessionRecorder.recordScene({
-      subtype: "token-deleted",
+      subtype:   "token-deleted",
       timestamp: new Date().toISOString(),
-      sceneId: token.parent?.id ?? token.sceneId ?? null,
-      name: token.parent?.name ?? null,
-      token: { id: token.id, name: token.name, actorId: token.actorId },
+      sceneId:   token.parent?.id ?? token.sceneId ?? null,
+      name:      token.parent?.name ?? null,
+      token:     { id: token.id, name: token.name, actorId: token.actorId },
     });
   });
 }

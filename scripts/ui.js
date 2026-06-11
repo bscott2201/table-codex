@@ -1,4 +1,4 @@
-import { getSetting, setSetting, cleanToken } from "./settings.js";
+import { MODULE_ID, getSetting, setSetting, cleanToken } from "./settings.js";
 import { sessionRecorder } from "./session-recorder.js";
 import { exportJson, exportMarkdown, syncSession, retrySyncSession, forceSyncSession, exportUnsyncedJson, exportUnsyncedMarkdown } from "./exporter.js";
 import { apiClient } from "./api-client.js";
@@ -19,7 +19,7 @@ export class TableCodexPanel extends Application {
     return foundry.utils.mergeObject(super.defaultOptions, {
       id:        "tablecodex-panel",
       title:     "TableCodex Sync",
-      template:  "modules/tablecodex-sync/templates/session-panel.hbs",
+      template:  `modules/${MODULE_ID}/templates/session-panel.hbs`,
       width:     380,
       height:    "auto",
       resizable: false,
@@ -183,7 +183,7 @@ export class UnsyncedSessionsDialog extends Application {
     return foundry.utils.mergeObject(super.defaultOptions, {
       id:        "tablecodex-unsynced",
       title:     "TableCodex — Unsynced Sessions",
-      template:  "modules/tablecodex-sync/templates/unsynced-sessions.hbs",
+      template:  `modules/${MODULE_ID}/templates/unsynced-sessions.hbs`,
       width:     500,
       height:    "auto",
       resizable: true,
@@ -273,12 +273,14 @@ export function refreshUnsyncedDialog() {
 export function injectSceneControls(controls) {
   if (!game.user?.isGM) return;
 
-  const isActive = sessionRecorder.isActive;
-  const tokenGroup = Array.isArray(controls)
-    ? controls.find((c) => c.name === "token" || c.name === "tokens")
-    : (controls.tokens ?? controls.token);
+  const isActive  = sessionRecorder.isActive;
+  const isArray   = Array.isArray(controls);
+  const hasV14Obj = !isArray && !!controls?.tokens?.tools;
 
-  if (!tokenGroup?.tools) return;
+  console.debug(
+    `[TableCodex Sync] injectSceneControls — shape: ${isArray ? "array (V13)" : "object (V14)"}`,
+    hasV14Obj ? `token tool keys: ${Object.keys(controls.tokens.tools).join(", ")}` : "(no tokens.tools)"
+  );
 
   const _toggleSession = async () => {
     if (sessionRecorder.isActive) {
@@ -291,35 +293,45 @@ export function injectSceneControls(controls) {
       if (title === null) return;
       await sessionRecorder.start({ sessionTitle: title });
     }
-    ui.controls?.render();
+    ui.controls?.render?.();
   };
 
-  const panelTool = {
-    name:     "tablecodex-panel",
-    title:    "TableCodex Sync",
-    icon:     "fas fa-scroll",
-    button:   true,
-    onClick:  () => openPanel(),  // V14
-    onChange: () => openPanel(),  // V13 fallback
-  };
-
-  const sessionTool = {
-    name:     "tablecodex-session",
-    title:    isActive
-      ? game.i18n.localize("TABLECODEX.Controls.StopSession")
-      : game.i18n.localize("TABLECODEX.Controls.StartSession"),
-    icon:     isActive ? "fas fa-stop-circle" : "fas fa-circle",
-    button:   true,
-    onClick:  _toggleSession,  // V14
-    onChange: _toggleSession,  // V13 fallback
-  };
-
-  if (Array.isArray(tokenGroup.tools)) {
-    tokenGroup.tools.push(panelTool, sessionTool);
-  } else {
-    tokenGroup.tools["tablecodex-panel"]   = panelTool;
-    tokenGroup.tools["tablecodex-session"] = sessionTool;
+  // ── Foundry V14: object-keyed controls ──────────────────────────────────
+  if (hasV14Obj) {
+    const n = Object.keys(controls.tokens.tools).length;
+    controls.tokens.tools["tablecodex-panel"] = {
+      name:     "tablecodex-panel",
+      title:    "TableCodex Sync",
+      icon:     "fa-solid fa-scroll",
+      order:    n + 100,
+      button:   true,
+      visible:  true,
+      onChange: () => openPanel(),
+    };
+    controls.tokens.tools["tablecodex-session"] = {
+      name:     "tablecodex-session",
+      title:    isActive ? "Stop TableCodex Session" : "Start TableCodex Session",
+      icon:     isActive ? "fa-solid fa-stop-circle" : "fa-regular fa-circle",
+      order:    n + 101,
+      button:   true,
+      visible:  true,
+      onChange: _toggleSession,
+    };
+    return;
   }
+
+  // ── Foundry V13 fallback: array controls ─────────────────────────────────
+  if (isArray) {
+    const tokenGroup = controls.find((c) => c.name === "token" || c.name === "tokens");
+    if (!tokenGroup?.tools) return;
+    tokenGroup.tools.push(
+      { name: "tablecodex-panel",  title: "TableCodex Sync",         icon: "fas fa-scroll",       button: true, onClick: () => openPanel(), onChange: () => openPanel() },
+      { name: "tablecodex-session", title: isActive ? "Stop TableCodex Session" : "Start TableCodex Session", icon: isActive ? "fas fa-stop-circle" : "fas fa-circle", button: true, onClick: _toggleSession, onChange: _toggleSession }
+    );
+    return;
+  }
+
+  console.warn("[TableCodex Sync] injectSceneControls: unrecognised controls shape — no buttons added.");
 }
 
 // ---------------------------------------------------------------------------
