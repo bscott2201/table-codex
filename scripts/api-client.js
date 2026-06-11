@@ -1,11 +1,26 @@
 import { MODULE_ID, getSetting } from "./settings.js";
-import { log } from "./logger.js";
+import { log, debug } from "./logger.js";
 
-function _base() {
-  let url = (getSetting("tablecodexApiUrl") ?? "").trim().replace(/\/$/, "");
-  if (!url) throw new Error(game.i18n.localize("TABLECODEX.Error.NoApiUrl"));
-  return url;
+// ---------------------------------------------------------------------------
+// URL helpers
+// ---------------------------------------------------------------------------
+
+export function normalizeBaseUrl(url) {
+  // Strip trailing slashes, then strip a trailing /api segment so callers
+  // that enter either "https://host" or "https://host/api" both work.
+  return (url ?? "").trim().replace(/\/+$/, "").replace(/\/api$/, "");
 }
+
+export function buildApiUrl(path) {
+  const raw = getSetting("tablecodexApiUrl") ?? "";
+  if (!raw.trim()) throw new Error(game.i18n.localize("TABLECODEX.Error.NoApiUrl"));
+  // path must start with /integrations/... (no /api prefix — we add it here)
+  return `${normalizeBaseUrl(raw)}/api${path}`;
+}
+
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
 
 function _token() {
   const t = getSetting("apiToken") ?? "";
@@ -18,18 +33,27 @@ function _headers() {
     "Authorization": `Bearer ${_token()}`,
     "Content-Type": "application/json",
     "X-Foundry-Module": MODULE_ID,
+    "X-Foundry-Version": game.version ?? "14",
+    "X-TableCodex-World-Id": game.world?.id ?? "",
   };
 }
 
 async function _request(method, path, body) {
-  const url = `${_base()}${path}`;
-  const opts = {
-    method,
-    headers: _headers(),
-  };
+  const url = buildApiUrl(path);
+  debug("API request:", method, url);
+
+  const opts = { method, headers: _headers() };
   if (body !== undefined) opts.body = JSON.stringify(body);
 
-  const res = await fetch(url, opts);
+  let res;
+  try {
+    res = await fetch(url, opts);
+  } catch (networkErr) {
+    debug("Network error:", networkErr);
+    throw new Error(
+      `Connection failed. Check API URL, token, and CORS configuration. (${networkErr.message})`
+    );
+  }
 
   if (!res.ok) {
     let msg = `HTTP ${res.status}`;
@@ -37,6 +61,7 @@ async function _request(method, path, body) {
       const data = await res.json();
       msg = data?.message ?? data?.error ?? msg;
     } catch { /* ignore parse error */ }
+    debug("API error response:", res.status, msg, "URL:", url);
     throw new Error(msg);
   }
 
@@ -45,10 +70,14 @@ async function _request(method, path, body) {
   return { ok: true };
 }
 
+// ---------------------------------------------------------------------------
+// Public API client
+// ---------------------------------------------------------------------------
+
 export const apiClient = {
   async testConnection() {
     try {
-      const result = await _request("POST", "/api/integrations/foundry/connect", {
+      const result = await _request("POST", "/integrations/foundry/connect", {
         worldId: game.world?.id ?? "",
         worldName: game.world?.title ?? "",
         foundryVersion: game.version ?? "14",
@@ -58,14 +87,16 @@ export const apiClient = {
       ui.notifications.info(game.i18n.localize("TABLECODEX.Notify.ConnectionOk"));
       return { success: true, data: result };
     } catch (err) {
-      ui.notifications.error(`${game.i18n.localize("TABLECODEX.Notify.ConnectionFailed")}: ${err.message}`);
+      const msg = "Connection failed. Check API URL, token, and CORS configuration.";
+      ui.notifications.error(`TableCodex: ${msg}`);
+      debug("testConnection error:", err.message);
       return { success: false, error: err.message };
     }
   },
 
   async syncSession(payload) {
     try {
-      const result = await _request("POST", "/api/integrations/foundry/session-import", payload);
+      const result = await _request("POST", "/integrations/foundry/session-import", payload);
       const importId = result?.importId ?? result?.id ?? null;
       log("Session synced, importId:", importId);
       ui.notifications.info(game.i18n.localize("TABLECODEX.Notify.SyncOk"));
@@ -78,7 +109,7 @@ export const apiClient = {
 
   async getSyncStatus(importId) {
     try {
-      const result = await _request("GET", `/api/integrations/foundry/sync-status/${importId}`);
+      const result = await _request("GET", `/integrations/foundry/sync-status/${importId}`);
       return { success: true, data: result };
     } catch (err) {
       return { success: false, error: err.message };
