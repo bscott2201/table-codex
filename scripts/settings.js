@@ -1,7 +1,7 @@
 export const MODULE_ID = "tablecodex-sync";
 export const MODULE_TITLE = "TableCodex Sync";
 export const SCHEMA_VERSION = "1.0.0";
-export const MODULE_VERSION = "0.2.1";
+export const MODULE_VERSION = "0.2.2";
 
 export function registerSettings() {
   const S = game.settings;
@@ -25,6 +25,13 @@ export function registerSettings() {
     type: String,
     default: "",
     restricted: true,
+    onChange: (value) => {
+      const cleaned = cleanToken(value);
+      if (cleaned !== value) {
+        // Re-save the normalized value silently so the stored token is always clean.
+        game.settings.set(m, "apiToken", cleaned);
+      }
+    },
   });
 
   S.register(m, "foundryWorldId", {
@@ -139,6 +146,11 @@ export function registerSettings() {
     type: String,
     default: "",
   });
+}
+
+// Normalize a raw token value: trim whitespace and strip surrounding quotes.
+export function cleanToken(raw) {
+  return (raw ?? "").trim().replace(/^["']|["']$/g, "").trim();
 }
 
 export function getSetting(key) {

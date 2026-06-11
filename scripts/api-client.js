@@ -1,4 +1,4 @@
-import { MODULE_ID, getSetting } from "./settings.js";
+import { MODULE_ID, getSetting, cleanToken } from "./settings.js";
 import { log, debug } from "./logger.js";
 
 // ---------------------------------------------------------------------------
@@ -22,8 +22,10 @@ export function buildApiUrl(path) {
 // ---------------------------------------------------------------------------
 
 function _token() {
-  const t = getSetting("apiToken") ?? "";
+  // Always clean on read — catches any value stored before the onChange normalizer existed.
+  const t = cleanToken(getSetting("apiToken"));
   if (!t) throw new Error(game.i18n.localize("TABLECODEX.Error.NoApiToken"));
+  debug(`Token loaded — length: ${t.length}, starts with: ${t.slice(0, 4)}...`);
   return t;
 }
 
@@ -108,18 +110,17 @@ function _connectionErrorMessage(err) {
 
 export const apiClient = {
   async testConnection() {
-    const worldId   = game.world?.id    ?? "";
-    const worldName = game.world?.title ?? "";
-
     const connectBody = {
-      foundryWorldId:   worldId,
-      foundryWorldName: worldName,
-      systemId:         game.system?.id ?? "",
-      foundryVersion:   game.version ?? "14",
-      moduleVersion:    game.modules.get(MODULE_ID)?.version ?? "0.2.0",
+      foundryWorldId:   game.world?.id    ?? "",
+      foundryWorldName: game.world?.title ?? "",
+      systemId:         game.system?.id   ?? "",
+      foundryVersion:   game.version      ?? "14",
+      moduleVersion:    game.modules.get(MODULE_ID)?.version ?? "0.2.2",
     };
 
-    debug("testConnection body:", connectBody);
+    // Log body before the request (token is not part of the body).
+    debug("testConnection — url:", buildApiUrl("/integrations/foundry/connect"));
+    debug("testConnection — body:", JSON.stringify(connectBody));
 
     try {
       const result = await _request("POST", "/integrations/foundry/connect", connectBody);

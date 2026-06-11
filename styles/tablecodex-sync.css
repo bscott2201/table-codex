@@ -215,6 +215,28 @@
   font-size: 0.75rem;
 }
 
+.tc-btn--test {
+  background: #1a6e5e;
+  border-color: #1abc9c;
+  color: #fff;
+}
+
+.tc-btn--test:hover {
+  background: #1f8a72;
+  border-color: #48d6b8;
+}
+
+.tc-btn--settings {
+  background: #4a3a1a;
+  border-color: #e0a030;
+  color: #fff;
+}
+
+.tc-btn--settings:hover {
+  background: #5e4a20;
+  border-color: #f0b840;
+}
+
 /* ── Footer ────────────────────────────────────────────────────────────── */
 .tc-footer {
   display: flex;

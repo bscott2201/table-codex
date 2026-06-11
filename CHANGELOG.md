@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.2 — Token Hardening & UI
+
+- `cleanToken()` helper strips whitespace and surrounding quotes from any raw token value
+- `apiToken` setting `onChange` normalizes and re-saves the value immediately when settings are saved — stored token is always clean
+- `_token()` in api-client always applies `cleanToken()` on read as a second safety net
+- Debug mode logs token length and first 4 characters only (never the full value)
+- Debug mode logs final request URL and body for `/connect` before the fetch fires
+- Test Connection and Settings footer buttons now have distinct bright colors with white text (`tc-btn--test` teal, `tc-btn--settings` amber)
+
 ## 0.2.1 — Connection Debugging
 
 - Fixed connect body field names to match API (`foundryWorldId`, `foundryWorldName`, `systemId`)
