@@ -33,6 +33,17 @@ var _userTargets = new Map();
 var _recentActions = [];
 var RECENT_MAX = 20;
 
+// Debug counts — reset on startSession, read by exporter for pre-flight log
+var _debugCounts = {
+  spellActionCount:    0,
+  weaponActionCount:   0,
+  featureActionCount:  0,
+  damageCardCount:     0,
+  hpChangeCount:       0,
+  initiativeRollCount: 0,
+  sanitizedSpeakerCount: 0,
+};
+
 // ---------------------------------------------------------------------------
 // Public interface
 // ---------------------------------------------------------------------------
@@ -50,6 +61,15 @@ export var telemetryRecorder = {
     _tokenPre.clear();
     _userTargets.clear();
     _recentActions.length = 0;
+    _debugCounts = {
+      spellActionCount:    0,
+      weaponActionCount:   0,
+      featureActionCount:  0,
+      damageCardCount:     0,
+      hpChangeCount:       0,
+      initiativeRollCount: 0,
+      sanitizedSpeakerCount: 0,
+    };
     _emit("session_started", "session", game.user && game.user.id);
     log("Telemetry recorder started. sessionId: " + sessionId);
   },
@@ -63,6 +83,7 @@ export var telemetryRecorder = {
   getEvents:      function() { return _events.slice(); },
   getEventCount:  function() { return _events.length; },
   clearEvents:    function() { _events = []; _sequence = 0; },
+  getDebugCounts: function() { return Object.assign({}, _debugCounts); },
 };
 
 // ---------------------------------------------------------------------------
@@ -94,21 +115,45 @@ function _shouldCapture(category) {
 export function onCreateChatMessage(message, _opts, userId) {
   if (!_active || !_shouldCapture("chat")) return;
 
-  // Skip blank messages
-  var text = _plainText(message.content || "").trim();
-  if (!text && !message.rolls && !(message.rolls && message.rolls.length)) return;
+  var html = message.content || "";
+  var text = _plainText(html).trim();
+  if (!text && !(message.rolls && message.rolls.length)) return;
 
   var ev = _makeEvent("chat_message", "chat", userId);
   ev.message = _serializeMessage(message);
   ev.targets = _getUserTargets(userId);
   ev.actor   = _actorFromSpeaker(message.speaker);
+  ev.action  = _extractAction(message);
+
+  // MIDI-QOL damage card — extract structured damage rows
+  var midiDamage = _parseMidiQolDamage(html);
+  if (midiDamage) {
+    ev.action = ev.action || {};
+    ev.action.type = "damage";
+    ev.action.name = "HP Updated";
+    ev.damage = midiDamage;
+    _debugCounts.damageCardCount += 1;
+  }
+
+  // Track action type counts for the pre-flight summary
+  if (ev.action) {
+    var at = ev.action.type || "unknown";
+    if (at === "spell")   _debugCounts.spellActionCount   += 1;
+    if (at === "weapon")  _debugCounts.weaponActionCount  += 1;
+    if (at === "feat")    _debugCounts.featureActionCount += 1;
+    if (at === "damage")  _debugCounts.damageCardCount    += 1;
+  }
 
   // Rolls embedded in this chat message
   var rolls = message.rolls || [];
   if (rolls.length > 0) {
     var rollInfo = _classifyRolls(rolls, message);
-    ev.roll     = rollInfo;
-    ev.action   = _extractAction(message);
+    ev.roll = rollInfo;
+
+    if (rollInfo.type === "initiative_roll") {
+      _debugCounts.initiativeRollCount += 1;
+      ev.message.category = "initiative";
+    }
 
     // Emit a dedicated roll event for easier querying
     var rollEv = _makeEvent(rollInfo.type, "roll", userId);
@@ -129,8 +174,6 @@ export function onCreateChatMessage(message, _opts, userId) {
     }
 
     _pushEvent(rollEv);
-  } else {
-    ev.action = _extractAction(message);
   }
 
   _pushEvent(ev);
@@ -178,6 +221,7 @@ export function onUpdateActor(actor, changes, _opts, userId) {
     updatedFields: Object.keys(changes),
   };
   ev.correlatedAction = _findRecentAction(actor.id);
+  if (hpDelta !== null && hpDelta !== 0) _debugCounts.hpChangeCount += 1;
   _pushEvent(ev);
 }
 
@@ -660,24 +704,37 @@ function _itemActionSnap(item) {
 // ---------------------------------------------------------------------------
 
 function _serializeMessage(message) {
-  var speaker = message.speaker || {};
-  var user    = game.users && game.users.get(message.user || message.author);
+  var spk  = message.speaker || {};
+  var user = game.users && game.users.get(message.user || message.author);
+  var html = message.content || "";
+
+  // Sanitized speaker — only primitive string/number fields, never the User document
+  var speaker = {
+    userId:    (typeof (message.user || message.author) === "string") ? (message.user || message.author) : null,
+    userName:  user ? user.name : null,
+    actorId:   spk.actor  || null,
+    actorName: spk.alias  || null,
+    tokenId:   spk.token  || null,
+    sceneId:   spk.scene  || null,
+    sceneName: spk.scene  ? ((game.scenes && game.scenes.get(spk.scene) && game.scenes.get(spk.scene).name) || null) : null,
+  };
+
+  var title    = _extractHtmlTitle(html);
+  var subtitle = _extractHtmlSubtitle(html);
 
   return {
-    id:        message.id,
-    speaker: {
-      userId:    message.user || message.author || null,
-      userName:  user ? user.name : null,
-      actorId:   speaker.actor || null,
-      actorName: speaker.alias || null,
-      tokenId:   speaker.token || null,
-      sceneId:   speaker.scene || null,
-    },
-    contentText: _plainText(message.content || ""),
-    contentHtml: getSetting("includeRawHtml") !== false ? (message.content || "") : undefined,
+    id:          message.id,
+    speaker:     speaker,
+    contentText: _plainText(html),
+    contentHtml: getSetting("includeRawHtml") !== false ? html : undefined,
     flavor:      message.flavor  || "",
+    title:       title,
+    subtitle:    subtitle,
+    category:    _chatCategory(message, (message.whisper || []).length > 0),
+    isWhisper:   (message.whisper || []).length > 0,
+    isBlind:     message.blind || false,
     whisper:     message.whisper || [],
-    blind:       message.blind   || false,
+    rolls:       [],
   };
 }
 
@@ -744,7 +801,7 @@ function _rollResult(roll, type) {
 }
 
 // ---------------------------------------------------------------------------
-// dnd5e action extraction
+// Action extraction (dnd5e flags + HTML fallback + item document resolution)
 // ---------------------------------------------------------------------------
 
 function _extractAction(message) {
@@ -752,57 +809,246 @@ function _extractAction(message) {
   var flags    = message.flags || {};
   var dnd5e    = flags.dnd5e   || {};
   var itemMeta = dnd5e.item    || {};
+  var html     = message.content || "";
 
-  var itemId    = itemMeta.id   || null;
-  var itemUuid  = itemMeta.uuid || null;
-  var itemName  = itemMeta.name || null;
-  var itemType  = itemMeta.type || null;
+  // -- Start with flag data (most reliable) --
+  var itemId   = itemMeta.id   || null;
+  var itemUuid = itemMeta.uuid || null;
+  var itemName = itemMeta.name || null;
+  var itemType = itemMeta.type || null;
 
-  // dnd5e 3.x: embedded item document
+  // -- Try embedded item document (dnd5e 3.x) --
+  var spellLevel  = null;
+  var school      = null;
+  var activation  = null;
+  var range       = null;
+  var dc          = null;
+  var damageParts = null;
+
   try {
     var embed = message.item;
     if (embed) {
-      itemName  = itemName  || embed.name || null;
-      itemType  = itemType  || embed.type || null;
+      itemName = itemName || embed.name || null;
+      itemType = itemType || embed.type || null;
 
-      var sys   = embed.system || {};
-      var dc    = (sys.save && sys.save.dc) ? sys.save.dc : (dnd5e.roll && dnd5e.roll.dc ? dnd5e.roll.dc : null);
-      var dmg   = sys.damage || {};
-      var parts = null;
+      var sys  = embed.system || {};
+      var dmg  = sys.damage   || {};
+
+      spellLevel = sys.level || sys.preparation?.level || null;
+      school     = (sys.school) ? sys.school : null;
+      activation = sys.activation ? sys.activation.type : null;
+      range      = sys.range ? (sys.range.value ? (sys.range.value + (sys.range.units ? " " + sys.range.units : "")) : sys.range.units || null) : null;
+
+      // Save DC
+      dc = (sys.save && sys.save.dc) ? sys.save.dc
+         : (dnd5e.roll && dnd5e.roll.dc) ? dnd5e.roll.dc
+         : null;
+
+      // Damage parts (dnd5e 2.x array, 3.x may differ)
       if (dmg.parts && dmg.parts.length > 0) {
-        parts = dmg.parts.map(function(p) {
+        damageParts = dmg.parts.map(function(p) {
           return Array.isArray(p) ? { formula: p[0], type: p[1] } : p;
         });
       }
-
-      return {
-        type:       itemType || "item",
-        name:       itemName,
-        itemId:     itemId,
-        itemUuid:   itemUuid,
-        itemType:   itemType,
-        spellLevel: sys.level || null,
-        activation: sys.activation ? sys.activation.type : null,
-        range:      sys.range ? sys.range.value : null,
-        dc:         dc,
-        damageParts: parts,
-      };
     }
-  } catch (err) { /* ignore — system-specific */ }
+  } catch (err) { /* system-specific — ignore */ }
 
-  if (!itemName && !itemId) return null;
+  // -- HTML fallback: extract title and subtitle when flags are absent --
+  var htmlTitle    = _extractHtmlTitle(html);
+  var htmlSubtitle = _extractHtmlSubtitle(html);
+  itemName = itemName || htmlTitle || null;
+
+  // -- Parse subtitle for spell level + school --
+  if (htmlSubtitle) {
+    var parsed = _parseSubtitle(htmlSubtitle);
+    if (spellLevel === null) spellLevel = parsed.spellLevel;
+    if (school     === null) school     = parsed.school;
+  }
+
+  // -- Classify action type --
+  var actionType = _classifyActionType(itemType, itemName, htmlSubtitle, html);
+
+  // -- Try to resolve item document for extra metadata --
+  if (itemId || itemUuid) {
+    var resolved = _resolveItemMeta(itemId, itemUuid, message.speaker);
+    if (resolved) {
+      itemName    = itemName    || resolved.name;
+      itemType    = itemType    || resolved.type;
+      spellLevel  = spellLevel  !== null ? spellLevel  : resolved.spellLevel;
+      school      = school      !== null ? school      : resolved.school;
+      activation  = activation  !== null ? activation  : resolved.activation;
+      range       = range       !== null ? range       : resolved.range;
+      dc          = dc          !== null ? dc          : resolved.dc;
+      damageParts = damageParts !== null ? damageParts : resolved.damageParts;
+    }
+  }
+
+  if (!itemName && !itemId && actionType === "unknown") return null;
+
   return {
-    type:       itemType || "item",
-    name:       itemName,
-    itemId:     itemId,
-    itemUuid:   itemUuid,
-    itemType:   itemType,
-    spellLevel: null,
-    activation: null,
-    range:      null,
-    dc:         null,
-    damageParts: null,
+    type:        actionType,
+    name:        itemName,
+    itemId:      itemId,
+    itemUuid:    itemUuid,
+    itemType:    itemType,
+    spellLevel:  spellLevel,
+    school:      school,
+    activation:  activation,
+    range:       range,
+    dc:          dc,
+    damageParts: damageParts,
   };
+}
+
+// Classify an action into spell / weapon / feat / damage / unknown
+function _classifyActionType(itemType, name, subtitle, html) {
+  var t = (subtitle || "").toLowerCase();
+  var h = (html || "").toLowerCase();
+  var n = (name || "").toLowerCase();
+
+  if (itemType === "spell") return "spell";
+  if (itemType === "weapon" || itemType === "equipment") return "weapon";
+  if (itemType === "feat" || itemType === "feature") return "feat";
+
+  // Subtitle: spell school or level keyword
+  var schools = ["evocation", "conjuration", "transmutation", "abjuration", "divination", "enchantment", "illusion", "necromancy"];
+  var hasSchool = schools.some(function(s) { return t.indexOf(s) !== -1; });
+  if (hasSchool) return "spell";
+  if (t.indexOf("level") !== -1) return "spell";
+  if (t.indexOf("cantrip") !== -1) return "spell";
+
+  // Subtitle: weapon keywords
+  if (t.indexOf("natural") !== -1 || t.indexOf("melee") !== -1 || t.indexOf("ranged") !== -1 || t.indexOf("martial") !== -1 || t.indexOf("simple") !== -1) return "weapon";
+
+  // Subtitle: feature
+  if (t.indexOf("feature") !== -1 || t.indexOf("trait") !== -1) return "feat";
+
+  // HTML: MIDI-QOL damage card or HP Updated text
+  if (h.indexOf("midi-qol-damage-card") !== -1 || h.indexOf("midi-qol-dmg-row") !== -1 || n.indexOf("hp updated") !== -1) return "damage";
+
+  return "unknown";
+}
+
+// Parse subtitle text for spell level and school
+function _parseSubtitle(subtitle) {
+  var result = { spellLevel: null, school: null };
+  if (!subtitle) return result;
+
+  var levelMatch = subtitle.match(/(\d+)(?:st|nd|rd|th)\s+[Ll]evel/);
+  if (levelMatch) result.spellLevel = parseInt(levelMatch[1], 10);
+  if (/cantrip/i.test(subtitle)) result.spellLevel = 0;
+
+  var schools = ["Evocation", "Conjuration", "Transmutation", "Abjuration", "Divination", "Enchantment", "Illusion", "Necromancy"];
+  for (var i = 0; i < schools.length; i++) {
+    if (subtitle.toLowerCase().indexOf(schools[i].toLowerCase()) !== -1) {
+      result.school = schools[i];
+      break;
+    }
+  }
+  return result;
+}
+
+// Resolve a live item document from the game collection to get extra metadata
+function _resolveItemMeta(itemId, itemUuid, speaker) {
+  try {
+    var item = null;
+
+    // Try by UUID first (most precise)
+    if (itemUuid && typeof fromUuidSync === "function") {
+      item = fromUuidSync(itemUuid);
+    }
+
+    // Fallback: look in the speaking actor's items
+    if (!item && itemId && speaker && speaker.actor) {
+      var actor = game.actors && game.actors.get(speaker.actor);
+      if (actor) item = actor.items && actor.items.get(itemId);
+    }
+
+    // Fallback: look in world items
+    if (!item && itemId) {
+      item = game.items && game.items.get(itemId);
+    }
+
+    if (!item) return null;
+
+    var sys   = item.system || {};
+    var dmg   = sys.damage  || {};
+    var parsed = _parseSubtitle("");
+
+    return {
+      name:       item.name,
+      type:       item.type,
+      spellLevel: sys.level || null,
+      school:     sys.school || null,
+      activation: sys.activation ? sys.activation.type : null,
+      range:      sys.range ? (sys.range.value ? String(sys.range.value) + (sys.range.units ? " " + sys.range.units : "") : sys.range.units || null) : null,
+      dc:         (sys.save && sys.save.dc) ? sys.save.dc : null,
+      damageParts: (dmg.parts && dmg.parts.length > 0) ? dmg.parts.map(function(p) {
+        return Array.isArray(p) ? { formula: p[0], type: p[1] } : p;
+      }) : null,
+    };
+  } catch (err) {
+    return null;
+  }
+}
+
+// Parse MIDI-QOL damage card HTML into structured damage rows
+function _parseMidiQolDamage(html) {
+  if (!html) return null;
+  if (html.indexOf("midi-qol-damage-card") === -1 && html.indexOf("midi-qol-dmg-row") === -1 && html.toLowerCase().indexOf("hp updated") === -1) return null;
+
+  try {
+    var div = document.createElement("div");
+    div.innerHTML = html;
+
+    var rows = div.querySelectorAll(".midi-qol-dmg-row, .midi-qol-damage-row, [class*='midi-qol-dmg']");
+    var result = [];
+
+    rows.forEach(function(row) {
+      var imgEl = row.querySelector("img[alt], img[data-actor-uuid], img[data-actor-id], [data-actor-uuid], [data-actor-id]");
+      var targetName    = null;
+      var targetActorId = null;
+
+      if (imgEl) {
+        targetName = imgEl.getAttribute("alt") || imgEl.getAttribute("data-tooltip") || null;
+        var uuid = imgEl.getAttribute("data-actor-uuid") || "";
+        var m = uuid.match(/Actor\.([^.]+)$/);
+        if (m) targetActorId = m[1];
+        if (!targetActorId) targetActorId = imgEl.getAttribute("data-actor-id") || null;
+      }
+
+      // Try data attributes for HP values
+      var hpEl     = row.querySelector("[data-hp-before], [data-old-hp], [data-hp]");
+      var hpBefore = null;
+      var hpAfter  = null;
+      if (hpEl) {
+        hpBefore = parseFloat(hpEl.getAttribute("data-hp-before") || hpEl.getAttribute("data-old-hp") || "");
+        hpAfter  = parseFloat(hpEl.getAttribute("data-hp-after")  || hpEl.getAttribute("data-new-hp") || "");
+      }
+
+      var amountEl = row.querySelector(".midi-qol-dmg-value, .damage-value, [class*='damage']");
+      var amount   = amountEl ? parseFloat(amountEl.textContent.trim()) : null;
+
+      if (targetName || targetActorId || amount !== null) {
+        result.push({
+          targetName:    targetName,
+          targetActorId: targetActorId,
+          hpBefore:      isNaN(hpBefore) ? null : hpBefore,
+          hpAfter:       isNaN(hpAfter)  ? null : hpAfter,
+          hpDelta:       (!isNaN(hpBefore) && !isNaN(hpAfter)) ? (hpAfter - hpBefore) : null,
+          tempHpBefore:  null,
+          tempHpAfter:   null,
+          tempHpDelta:   null,
+          amount:        isNaN(amount) ? null : amount,
+          damageType:    null,
+        });
+      }
+    });
+
+    return result.length > 0 ? result : null;
+  } catch (err) {
+    return null;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -845,4 +1091,45 @@ function _plainText(html) {
   } catch (e) {
     return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
   }
+}
+
+// Extract the primary heading/title from a chat card HTML string
+function _extractHtmlTitle(html) {
+  if (!html) return "";
+  try {
+    var div = document.createElement("div");
+    div.innerHTML = html;
+    // dnd5e card hierarchy: .item-name, .action, h3, h4
+    var el = div.querySelector(".item-name, .action, .card-header h3, h3, h4, .title");
+    return el ? el.textContent.trim() : "";
+  } catch (e) {
+    return "";
+  }
+}
+
+// Extract the subtitle (spell level, weapon type, feature, etc.)
+function _extractHtmlSubtitle(html) {
+  if (!html) return "";
+  try {
+    var div = document.createElement("div");
+    div.innerHTML = html;
+    // dnd5e 2.x card has <span class="subtitle"> inside .card-header
+    var el = div.querySelector(".subtitle, .card-subtitle, .item-type, [class*='subtitle']");
+    return el ? el.textContent.trim() : "";
+  } catch (e) {
+    return "";
+  }
+}
+
+// Classify the chat category (roll / emote / ooc / whisper / initiative / ic)
+function _chatCategory(message, isWhisper) {
+  if (isWhisper) return "whisper";
+  var typeConst = (CONST && CONST.CHAT_MESSAGE_TYPES) ? CONST.CHAT_MESSAGE_TYPES : {};
+  var t = message.type;
+  if (t === typeConst.ROLL   || t === "roll")  return "roll";
+  if (t === typeConst.EMOTE  || t === "emote") return "emote";
+  if (t === typeConst.OOC    || t === "ooc")   return "ooc";
+  // Check flavor for initiative
+  if (message.flavor && message.flavor.toLowerCase().indexOf("initiative") !== -1) return "initiative";
+  return "ic";
 }

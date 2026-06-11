@@ -321,7 +321,7 @@ export const sessionRecorder = {
     );
 
     return {
-      schemaVersion: "1.1.0",
+      schemaVersion: "1.2.0",
       captureMode,
       source:        "foundry_vtt",
       moduleId:      MODULE_ID,

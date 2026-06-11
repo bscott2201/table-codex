@@ -45,6 +45,7 @@ export function normalizeChat(message) {
   const contentRaw  = message.content ?? "";
   const contentText = _extractPlainText(contentRaw);
   const title       = _extractChatTitle(contentRaw);
+  const subtitle    = _extractChatSubtitle(contentRaw);
   const category    = _extractChatCategory(message, isWhisper);
 
   // Extract referenced entity IDs from HTML data attributes
@@ -53,12 +54,14 @@ export function normalizeChat(message) {
 
   const out = {
     messageId:   message.id,
+    id:          message.id,
     timestamp:   message.timestamp
       ? new Date(message.timestamp).toISOString()
       : new Date().toISOString(),
     speaker,
     contentText,
     title,
+    subtitle,
     category,
     flavor:          message.flavor ?? "",
     isWhisper,
@@ -212,7 +215,19 @@ function _extractChatTitle(html) {
   try {
     var div = document.createElement("div");
     div.innerHTML = html;
-    var el = div.querySelector("h3, h4, .card-header .item-name, .action, .flavor-text");
+    var el = div.querySelector(".item-name, .action, .card-header h3, h3, h4, .title");
+    return el ? el.textContent.trim() : "";
+  } catch (e) {
+    return "";
+  }
+}
+
+function _extractChatSubtitle(html) {
+  if (!html) return "";
+  try {
+    var div = document.createElement("div");
+    div.innerHTML = html;
+    var el = div.querySelector(".subtitle, .card-subtitle, .item-type, [class*='subtitle']");
     return el ? el.textContent.trim() : "";
   } catch (e) {
     return "";

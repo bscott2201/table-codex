@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.5.1 — Clean Action Metadata
+
+**Speaker sanitization hardened:** `_serializeMessage` now explicitly checks `typeof userId === "string"` before assigning, ensuring the full User document (with hotbar, flags, permissions) can never appear in `speaker.userId`. `sceneName` added to speaker object.
+
+**Title / subtitle extraction:** Both `_extractHtmlTitle` and `_extractHtmlSubtitle` added to `telemetry-recorder.js` and `event-normalizer.js`. Title queries `.item-name`, `.action`, `h3`, `h4`. Subtitle queries `.subtitle`, `.card-subtitle`, `.item-type`. These are used as the fallback when dnd5e flags are absent.
+
+**`_classifyActionType`:** Classifies each action as `spell / weapon / feat / damage / unknown` using itemType → subtitle keywords → HTML content, in priority order. Examples:
+- Subtitle containing "Evocation" or "1st Level" → `spell`
+- Subtitle containing "Melee", "Natural", "Martial", "Ranged" → `weapon`
+- Subtitle containing "Feature" or "Trait" → `feat`
+- HTML containing `midi-qol-damage-card` → `damage`
+
+**`_parseSubtitle`:** Extracts `spellLevel` (integer, 0 for cantrip) and `school` (Evocation, Conjuration, etc.) from subtitle text via regex.
+
+**`_resolveItemMeta`:** Tries `fromUuidSync(itemUuid)` → actor's item collection → world items to get spellLevel, school, activation, range, save DC, and damage parts directly from the live item document.
+
+**`_parseMidiQolDamage`:** Detects MIDI-QOL damage card HTML (`.midi-qol-damage-card`, `.midi-qol-dmg-row`). Extracts target name, actor ID (from `data-actor-uuid`), HP before/after/delta, and damage amount per row. Results go into `event.damage[]` and `event.action.type = "damage"`.
+
+**`_extractAction` rewritten:** Chains flags → embedded item doc → subtitle → live item resolution into a single comprehensive action object. Never returns partial data when full data is available via a different path.
+
+**Debug counts:** `telemetryRecorder.getDebugCounts()` returns `spellActionCount`, `weaponActionCount`, `featureActionCount`, `damageCardCount`, `hpChangeCount`, `initiativeRollCount`. All shown in the `syncSession` pre-flight console log.
+
+**Initiative suppression:** When `message.flavor` contains "initiative", `message.category` is set to `"initiative"` and `roll.type` is `"initiative_roll"`.
+
+**`event-normalizer.js`:** Added `subtitle` and `id` fields to normalized chat output. `_extractChatSubtitle` added.
+
+**Schema version:** `1.1.0` → `1.2.0`
+
 ## 0.5.0 — Rich Session Telemetry
 
 **New file: `scripts/telemetry-recorder.js`** — parallel event capture system that produces structured `TableCodexTelemetryEvent` objects for gameplay replay.

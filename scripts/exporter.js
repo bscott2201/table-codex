@@ -4,6 +4,7 @@
 // any engine-specific parsing issues with non-ASCII characters in ${...}.
 
 import { MODULE_ID, getSetting, cleanToken, getSelectedCampaignIdForApi } from "./settings.js";
+import { telemetryRecorder } from "./telemetry-recorder.js";
 import { sessionRecorder } from "./session-recorder.js";
 import { apiClient, validateReadyToSync, validateApiCredentials } from "./api-client.js";
 import { getWorldInfo } from "./world-info.js";
@@ -191,20 +192,24 @@ export async function syncSession() {
     "events:", (normalizedPayload.summary && normalizedPayload.summary.eventCount) || 0
   );
 
-  // Log envelope shape and payload array lengths before sending
+  // Log envelope shape, payload array lengths, and telemetry action counts
   var p = envelope.payload || {};
+  var tc = telemetryRecorder.getDebugCounts();
   console.log(
     "[TableCodex Sync] syncSession pre-flight",
     "\n  envelope keys:", Object.keys(envelope).join(", "),
-    "\n  payload keys:", Object.keys(p).join(", "),
     "\n  payload.events.length:", (p.events || []).length,
     "\n  payload.chatMessages.length:", (p.chatMessages || []).length,
     "\n  payload.rolls.length:", (p.rolls || []).length,
     "\n  payload.combats.length:", (p.combats || []).length,
     "\n  payload.actors.length:", (p.actors || []).length,
-    "\n  payload.items.length:", (p.items || []).length,
-    "\n  payload.scenes.length:", (p.scenes || []).length,
-    "\n  payload.journals.length:", (p.journals || []).length
+    "\n  payload.telemetryEvents.length:", (p.telemetryEvents || []).length,
+    "\n  telemetry.spellActionCount:", tc.spellActionCount,
+    "\n  telemetry.weaponActionCount:", tc.weaponActionCount,
+    "\n  telemetry.featureActionCount:", tc.featureActionCount,
+    "\n  telemetry.damageCardCount:", tc.damageCardCount,
+    "\n  telemetry.hpChangeCount:", tc.hpChangeCount,
+    "\n  telemetry.initiativeRollCount:", tc.initiativeRollCount
   );
 
   if (JSON.stringify(envelope).length > 5000000) {
