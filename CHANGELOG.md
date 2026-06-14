@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.1 — Fix "Missing helper: tcEq" on the campaign-link window
+
+The `init` hook registered the settings menu before the Handlebars helpers, and in Foundry V13+ `registerMenu` rejected the plain launcher class (menu `type` must be an ApplicationV2/FormApplication subclass). That threw mid-`init`, so the `tcEq` helper never registered and the campaign-link template failed to render.
+
+- Handlebars helpers (`tcEq`, `tcDate`) are now registered **first** in `init`, before anything that could throw.
+- The settings-menu launcher now extends `ApplicationV2` (valid `type`) and is wrapped in its own try/catch so a failure can't cascade.
+- The campaign-link template no longer depends on a custom helper — `selected` is precomputed in the context (`{{#if c.selected}}`).
+- libWrapper wiring moved from `init` to `setup` (after system detection) and the dnd5e activity fallback is gated to dnd5e only, fixing a latent ordering bug.
+
 ## 0.7.0 — Use the Foundry Integration API
 
 TableCodex exposes a purpose-built Foundry integration API (`/api/integrations/foundry/*`, tag `foundry`) designed for exactly this module. Repointed the client to it — it takes our structured telemetry directly, so the generic sessions/transcript workaround is gone.

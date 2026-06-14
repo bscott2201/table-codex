@@ -16,7 +16,7 @@ import { EVENT_TYPES, MODULE_ID, FLAGS } from "../core/constants.js";
 import { randomId } from "../core/util.js";
 import { logger } from "../core/logger.js";
 import { wrap } from "../core/libwrapper.js";
-import { emitsHook, resolveActivityContext, classifyItem } from "../integrations/dnd5e.js";
+import { isDnd5e, emitsHook, resolveActivityContext, classifyItem } from "../integrations/dnd5e.js";
 import { canCapture, emit } from "./base.js";
 
 /** Stamp/read a correlation id so Midi/roll events can be tied together. */
@@ -95,6 +95,7 @@ export function register() {
  * is a no-op (the hook path above is used instead).
  */
 export function maybeRegisterActivityFallback() {
+  if (!isDnd5e()) return; // non-dnd5e systems have no activity API to wrap
   if (emitsHook("dnd5e.postUseActivity") || emitsHook("dnd5e.useItem")) {
     return; // a real hook exists — no wrap needed
   }

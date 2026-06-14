@@ -79,16 +79,21 @@ export function registerLifecycle() {
 function _onInit() {
   try {
     logger.info(`init — ${MODULE_TITLE} v${MODULE_VERSION}`);
-    registerSettings();
-    registerSettingsMenu(openPanel);
 
-    // libWrapper wraps for methods that emit no usable hook (system-version
-    // gated internally). Safe no-op if libWrapper is somehow unavailable.
-    registerLibWrapperHooks();
-
-    // Handlebars helpers used by templates.
+    // Register Handlebars helpers FIRST so template rendering never lacks them,
+    // even if a later registration step throws.
     Handlebars.registerHelper("tcEq", (a, b) => a === b);
     Handlebars.registerHelper("tcDate", (ms) => (ms ? new Date(ms).toLocaleString() : ""));
+
+    registerSettings();
+
+    // The settings-menu launcher must be a valid ApplicationV2 subclass in V13+;
+    // isolate it so a registration failure can't cascade.
+    try {
+      registerSettingsMenu(openPanel);
+    } catch (err) {
+      logger.error("init: settings menu registration failed (non-fatal)", err);
+    }
   } catch (err) {
     logger.error("init hook failed", err);
   }
@@ -112,7 +117,10 @@ function _onSetup() {
   try {
     // System detection (dnd5e gating for Phase 3). Localization is ready here.
     detectSystem();
-    logger.debug("setup — system detected");
+    // libWrapper wraps run AFTER detection so hook-presence checks are valid and
+    // the dnd5e fallback is only attempted on dnd5e. Safe no-op otherwise.
+    registerLibWrapperHooks();
+    logger.debug("setup — system detected, libWrapper wired");
   } catch (err) {
     logger.error("setup hook failed", err);
   }

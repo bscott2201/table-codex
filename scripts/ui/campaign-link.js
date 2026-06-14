@@ -53,7 +53,11 @@ function getClass() {
         apiToken: getSetting(SETTINGS.API_TOKEN) || "",
         campaignId: selectedId,
         campaignName: getSetting(SETTINGS.CAMPAIGN_NAME) || "",
-        campaigns: this._campaigns,
+        // Precompute `selected` so the template needs no custom Handlebars helper.
+        campaigns: this._campaigns.map((c) => ({
+          ...c,
+          selected: String(c.id) === String(selectedId),
+        })),
         hasCampaigns: this._campaigns.length > 0,
         status: this._status,
       };
