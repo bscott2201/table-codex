@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.4 — Match the TableCodex Session Schema (fix 500 on sync)
+
+Read the published OpenAPI spec (`/api/docs/openapi.yaml`) and aligned sync with the real contract. The previous body sent extra `telemetry`/`date` keys to session-create, causing a 500.
+
+- **`SessionInput` has no telemetry field** — it accepts only `title`, `sessionNumber`, `playedAt`, `audioPath`, `status`. Session sync is now a **two-step flow**:
+  1. `POST /api/campaigns/:campaignId/sessions` with a valid `SessionInput` (`title`, `sessionNumber`, `playedAt`, `status: "uploaded"`) → returns the new numeric session id.
+  2. `POST /api/campaigns/:campaignId/sessions/:sessionId/transcript/upload` with `{ text }` → the human-readable Markdown session log is attached as the transcript (the server then marks the session `transcribed` and can run AI extraction).
+- The full JSON telemetry remains available via the JSON exporter and the local store; the transcript carries the readable log TableCodex expects.
+- `markdownExporter.renderFromPayload(payload)` added so the upload queue renders a transcript without recomputing reconstruction.
+- Failure handling: if session-create succeeds but the transcript upload fails, the error is surfaced with the created `sessionId`.
+
 ## 0.6.3 — Correct TableCodex API Endpoints
 
 Aligned the API client with the actual TableCodex routes (the previous `/api/ping`
