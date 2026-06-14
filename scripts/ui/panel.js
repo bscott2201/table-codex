@@ -88,7 +88,16 @@ function getPanelClass() {
       markdownExporter.download();
     }
     static async _onSyncNow() {
-      await uploadQueue.process();
+      const { snapshot, error } = await uploadQueue.syncNow();
+      if (error) {
+        ui.notifications?.warn(`TableCodex: ${error}`);
+      } else if (snapshot.failed > 0) {
+        ui.notifications?.error(`TableCodex: ${snapshot.failed} session(s) failed to sync (see console).`);
+      } else if (snapshot.pending > 0) {
+        ui.notifications?.info(`TableCodex: syncing ${snapshot.pending} session(s)…`);
+      } else {
+        ui.notifications?.info("TableCodex: sync complete — nothing pending.");
+      }
       _instance?.render();
     }
     static _onLinkCampaign() {
