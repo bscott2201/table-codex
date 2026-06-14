@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.2 — CORS-Safe API Requests
+
+- Removed the custom `X-TableCodex-Module` request header, which forced a CORS preflight that failed unless the server echoed it in `Access-Control-Allow-Headers` (the cause of the `x-tablecodex-module is not allowed` error). Module identity is now sent as a preflight-safe `?module=tablecodex-sync@<version>` query param.
+- `Content-Type: application/json` is now sent only on requests that carry a JSON body (POST sync), not on GET ping/campaigns.
+- Note: requests still send an `Authorization: Bearer` header, which is itself a non-simple header. The TableCodex server must answer CORS preflight (`OPTIONS`) with `Access-Control-Allow-Headers: Authorization, Content-Type`, `Access-Control-Allow-Methods: GET, POST, OPTIONS`, and an appropriate `Access-Control-Allow-Origin`.
+
 ## 0.6.1 — Campaign Selection in Link UI
 
 - **Test connection** now reports an inline result (success/error) in the campaign-link window, in addition to the notification.
