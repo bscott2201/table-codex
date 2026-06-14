@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.6.0 — Full Modular Rebuild (Telemetry Pipeline + Reconstruction)
+
+Complete ground-up rebuild of the module into a modular, production-grade
+telemetry pipeline for Foundry V14. The old flat `scripts/` layout was replaced
+with a layered architecture under `scripts/{core,bus,session,capture,integrations,reconstruction,export,ui}`.
+
+**Architecture**
+- **One-way pipeline:** Capture → Event Bus → Event Store (persist raw) → Reconstruction → Export/Upload.
+- **Required dependencies:** libWrapper + socketlib (declared in `module.json` relationships).
+- **GM-authoritative, exactly-once capture:** only the user who triggered a change captures it; player envelopes are forwarded to the GM over socketlib; the GM is the sole world-settings writer. Falls back to local buffering when no GM is connected.
+- **Strict event envelope:** every event carries `id, seq, timestamp, epochMs, sessionId, worldId, actorId, tokenId, userId, eventType, metadata, schema`, enforced by a single factory.
+- **Never lose data:** write-ahead persistence with debounced + checkpoint flushes; interrupted sessions resume on reload; reconstruction reads but never writes the raw log.
+- **No deprecated APIs:** ApplicationV2 + HandlebarsApplicationMixin UI; namespaced `foundry.utils.*`; V13/V14 scene-controls record shape.
+
+**Lifecycle (explicit hook timing)**
+- Module-scope: early global, pre-update hooks (before/after snapshots), scene controls.
+- `init`: settings, settings menu, libWrapper wraps, Handlebars helpers.
+- `socketlib.ready`: socket registration.
+- `setup`: system detection (dnd5e gating).
+- `ready`: diagnostics, full global API, store init + session resume, capture wiring, Midi detection, upload-queue start.
+
+**Phases**
+- P1 Foundation — bootstrap, settings, event bus/envelope/store, session manager, campaign-link + panel UI.
+- P2 Core telemetry — HP, movement, conditions, combat, rolls.
+- P3 D&D5e activity layer — activity, spell, weapon, feature, resource (prefers `dnd5e.*` hooks; libWrapper only where no hook exists).
+- P4 Midi-QOL enrichment — optional, runtime-detected; supersedes best-effort rolls via correlation id.
+- P5 Reconstruction engine — pure timeline reducers + combat reconstructor (combat → rounds → turns → actions with before/after state).
+- P6 Export & sync — JSON + Markdown exporters, durable upload queue (retry/backoff), fetch API client.
+
+**Verification:** `node --check` across all 39 scripts, `module.json`/`lang` JSON parse, and a Node harness (`tests/verify.mjs`, 18 assertions) exercising envelope enforcement, bus isolation, deterministic ordering, reconstruction, and GM store flush.
+
 ## 0.5.1 — Clean Action Metadata
 
 **Speaker sanitization hardened:** `_serializeMessage` now explicitly checks `typeof userId === "string"` before assigning, ensuring the full User document (with hotbar, flags, permissions) can never appear in `speaker.userId`. `sceneName` added to speaker object.

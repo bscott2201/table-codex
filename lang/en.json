@@ -1,5 +1,9 @@
 {
   "TABLECODEX": {
+    "Menu": {
+      "OpenPanel": "Open TableCodex Sync",
+      "OpenPanelHint": "Open the TableCodex Sync panel for session capture, export, and sync."
+    },
     "Settings": {
       "ApiUrl": {
         "Name": "TableCodex API URL",
@@ -9,118 +13,34 @@
         "Name": "API Token",
         "Hint": "Your TableCodex API token. Found in TableCodex → Settings → Integrations."
       },
-      "WorldId": {
-        "Name": "Foundry World ID",
-        "Hint": "Automatically populated from the current world."
+      "Enabled": {
+        "Name": "Enable Capture",
+        "Hint": "Master switch for telemetry capture. When off, no events are recorded even during a session."
       },
-      "WorldName": {
-        "Name": "Foundry World Name",
-        "Hint": "Automatically populated from the current world."
+      "CaptureMovement": {
+        "Name": "Capture Movement",
+        "Hint": "Record token movement (position, elevation, distance)."
       },
-      "CaptureWhispers": {
-        "Name": "Capture Whispers",
-        "Hint": "Include whispered chat messages in the session export. Default: off."
+      "CaptureRolls": {
+        "Name": "Capture Rolls",
+        "Hint": "Record dice rolls from chat messages (system-agnostic)."
       },
-      "CapturePrivateRolls": {
-        "Name": "Capture Private Rolls",
-        "Hint": "Include GM-only and blind rolls in the session export. Default: off."
+      "CaptureDnd5e": {
+        "Name": "Capture D&D5e Activity",
+        "Hint": "Record D&D5e activity, spell, weapon, feature, and resource usage. Ignored on non-dnd5e systems."
       },
-      "CaptureJournalText": {
-        "Name": "Capture Journal Text",
-        "Hint": "Include full journal page text in the session export. Default: off."
+      "CaptureMidi": {
+        "Name": "Capture Midi-QOL Enrichment",
+        "Hint": "When Midi-QOL is installed, record high-fidelity attack/damage/save outcomes."
       },
-      "CaptureActorSnapshots": {
-        "Name": "Capture Actor Snapshots",
-        "Hint": "Record actor summaries at session start/end and on creation/update."
-      },
-      "CaptureItemSnapshots": {
-        "Name": "Capture Item Snapshots",
-        "Hint": "Record item summaries at session start/end and on creation/update."
-      },
-      "CaptureSceneSnapshots": {
-        "Name": "Capture Scene Snapshots",
-        "Hint": "Record scene info at session start/end."
-      },
-      "AutoSync": {
-        "Name": "Auto-Sync on Session End",
-        "Hint": "Automatically POST the session to TableCodex when you end it."
-      },
-      "DebugLogging": {
-        "Name": "Debug Logging",
-        "Hint": "Log verbose capture events to the browser console."
-      },
-      "CaptureChat":           { "Name": "Capture Chat Messages",    "Hint": "Record chat messages and embedded rolls." },
-      "CaptureCombat":         { "Name": "Capture Combat Events",    "Hint": "Record combat start/end, round/turn changes, initiative, and defeated state." },
-      "CaptureActorUpdates":   { "Name": "Capture Actor Updates",    "Hint": "Record HP changes, healing, damage, and inventory changes." },
-      "CaptureTokenMovement":  { "Name": "Capture Token Movement",   "Hint": "Record token position changes (x/y/elevation)." },
-      "CaptureConditions":     { "Name": "Capture Conditions",       "Hint": "Record active effects and condition added/removed events." },
-      "CaptureJournals":       { "Name": "Capture Journal Events",   "Hint": "Record journal entry create/update events." },
-      "CapturePlaylists":      { "Name": "Capture Audio Cues",       "Hint": "Record playlist sound start/stop events. Default off (noisy)." },
-      "IncludeRawPayloads":    { "Name": "Include Raw Payloads",     "Hint": "Add a 'raw' field to each telemetry event with the original Foundry data. Increases export size." },
-      "TelemetryQueueMaxSize": { "Name": "Telemetry Queue Max Size", "Hint": "Maximum number of telemetry events to keep in memory. Oldest events are dropped when the limit is reached." },
-      "CaptureMode": {
-        "Name": "Capture Mode",
-        "Hint": "Controls what gets captured during a session. Standard is recommended for normal play.",
-        "Minimal": "Minimal — chat, rolls, combat, referenced entities only",
-        "Standard": "Standard (Recommended) — includes actor/item updates during session",
-        "FullSnapshot": "Full Snapshot — full world snapshot at session start/end (debug/recovery only, creates large exports)"
-      },
-      "IncludeRawHtml": {
-        "Name": "Include Raw HTML in Chat",
-        "Hint": "Include full HTML content in exported chat messages. Disable to reduce payload size."
-      }
-    },
-    "Controls": {
-      "StartSession": "Start TC Session",
-      "StopSession": "Stop TC Session"
-    },
-    "Session": {
-      "AlreadyActive": "A TableCodex session is already active.",
-      "NotActive": "No TableCodex session is currently active.",
-      "Started": "TableCodex session started.",
-      "Ended": "TableCodex session ended.",
-      "BufferCleared": "TableCodex session buffer cleared."
-    },
-    "Dialog": {
-      "EndSession": {
-        "Title": "End Session",
-        "Content": "End the current TableCodex session? You can still export or sync after ending."
-      },
-      "ClearBuffer": {
-        "Title": "Clear Session Buffer",
-        "Content": "This will permanently delete the current session buffer. This cannot be undone."
-      },
-      "SessionTitle": {
-        "Title": "Start Session",
-        "Label": "Session Title",
-        "Placeholder": "e.g. The Siege of Thornwall",
-        "Start": "Start"
+      "LogLevel": {
+        "Name": "Log Level",
+        "Hint": "Console verbosity for TableCodex diagnostics."
       }
     },
     "Notify": {
-      "PingOk": "TableCodex: API connection verified.",
-      "SyncOk": "TableCodex: Session synced successfully.",
-      "SyncFailed": "TableCodex: Sync failed",
-      "ExportJsonOk": "TableCodex: JSON exported.",
-      "ExportMdOk": "TableCodex: Markdown exported.",
-      "SessionResumed": "TableCodex: Resumed active session from before reload.",
-      "SessionPendingExport": "TableCodex: You have an unsaved session ready to export or sync.",
-      "CampaignLinked": "TableCodex: Campaign \"{name}\" selected.",
-      "CampaignAutoSelected": "TableCodex: Campaign \"{name}\" auto-selected.",
-      "WorldLinked": "TableCodex: World linked to \"{campaign}\"."
-    },
-    "Warn": {
-      "LargePayload": "TableCodex: Session payload is large (>5 MB). Sync may be slow.",
-      "NoCampaignsFound": "TableCodex: No campaigns found. Check your API URL and token.",
-      "NoCampaignSelected": "Select a campaign from the list first.",
-      "NoCampaignForSession": "No campaign selected. Select a campaign before syncing.",
-      "NoCampaignExport": "TableCodex: No campaign selected. You can choose a campaign during web upload."
-    },
-    "Error": {
-      "NoApiUrl": "TableCodex API URL is not configured.",
-      "NoApiToken": "TableCodex API token is not configured.",
-      "NoCampaign": "Select a TableCodex campaign before connecting.",
-      "NoSession": "No session data to sync."
+      "SessionResumed": "A TableCodex session in progress was resumed after reload.",
+      "SessionPendingExport": "A finished TableCodex session is pending export."
     }
   }
 }

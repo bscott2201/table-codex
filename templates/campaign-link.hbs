@@ -1,0 +1,29 @@
+{{!-- TableCodex Sync — campaign linking form (ApplicationV2) --}}
+<section class="tablecodex-campaign-link">
+  <p class="tc-hint">Bind this Foundry world to a TableCodex campaign. The API token is stored world-scoped.</p>
+
+  <div class="form-group">
+    <label for="tc-apiUrl">API URL</label>
+    <input type="text" id="tc-apiUrl" name="apiUrl" value="{{apiUrl}}" placeholder="https://app.tablecodex.com" />
+  </div>
+
+  <div class="form-group">
+    <label for="tc-apiToken">API Token</label>
+    <input type="password" id="tc-apiToken" name="apiToken" value="{{apiToken}}" placeholder="tc_..." />
+  </div>
+
+  <div class="form-group">
+    <label for="tc-campaignId">Campaign ID</label>
+    <input type="text" id="tc-campaignId" name="campaignId" value="{{campaignId}}" placeholder="cmp_..." />
+  </div>
+
+  <div class="form-group">
+    <label for="tc-campaignName">Campaign Name</label>
+    <input type="text" id="tc-campaignName" name="campaignName" value="{{campaignName}}" placeholder="Curse of Strahd" />
+  </div>
+
+  <footer class="tc-actions">
+    <button type="button" data-action="testConnection"><i class="fa-solid fa-plug"></i> Test connection</button>
+    <button type="submit"><i class="fa-solid fa-floppy-disk"></i> Save link</button>
+  </footer>
+</section>
