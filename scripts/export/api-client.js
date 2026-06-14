@@ -3,13 +3,14 @@
  * @file api-client.js
  * Phase 6: a small fetch-based client for the TableCodex API. No third-party
  * deps. All methods are defensive and return result objects rather than throwing
- * so the upload queue can decide retry policy. The actual TableCodex endpoints
- * are placeholders documented here; only the transport is implemented.
+ * so the upload queue can decide retry policy. Endpoints match the TableCodex
+ * OpenAPI spec (/api/me, /api/campaigns, /api/campaigns/:id/sessions[/transcript]).
  */
 
 import { MODULE_ID, MODULE_VERSION, SETTINGS } from "../core/constants.js";
 import { logger } from "../core/logger.js";
 import { getSetting } from "../core/settings.js";
+import { markdownExporter } from "./markdown-exporter.js";
 
 /** @typedef {{ ok: boolean, status?: number, detail?: string, error?: string, data?: any }} ApiResult */
 
@@ -123,51 +124,87 @@ class ApiClient {
   }
 
   /**
-   * Push a session payload. Sessions are nested under a campaign:
-   * `POST /api/campaigns/:campaignId/sessions` (campaignId is numeric server-side).
+   * Push a session to TableCodex. Per the API contract this is a two-step flow:
+   *   1. `POST /api/campaigns/:campaignId/sessions` with SessionInput
+   *      ({ title, sessionNumber, playedAt?, status? }) → returns the new session id.
+   *   2. `POST /api/campaigns/:campaignId/sessions/:sessionId/transcript/upload`
+   *      with { text } → attaches the human-readable session log (the server then
+   *      sets status to "transcribed" and can run AI extraction).
    *
-   * The TableCodex session schema requires at least `title` (string) and
-   * `sessionNumber` (number); the full telemetry payload is attached under
-   * `telemetry`. Adjust `_buildSessionBody` if the server schema gains/renames
-   * required fields.
+   * The session-create schema has no telemetry field, so the rich telemetry is
+   * delivered as the transcript text (Markdown). The full JSON payload remains
+   * available via the JSON exporter / local store.
    * @param {object} payload  Output of buildPayload().
    * @returns {Promise<ApiResult>}
    */
   async syncSession(payload) {
     const campaignId = (getSetting(SETTINGS.CAMPAIGN_ID) || "").toString().trim();
     if (!campaignId) return { ok: false, error: "no campaign linked" };
-    return this._request(
-      `/api/campaigns/${encodeURIComponent(campaignId)}/sessions`,
-      { method: "POST", body: JSON.stringify(this._buildSessionBody(payload)) },
+    const cid = encodeURIComponent(campaignId);
+
+    // 1) Create the session record.
+    const created = await this._request(
+      `/api/campaigns/${cid}/sessions`,
+      { method: "POST", body: JSON.stringify(this._buildSessionInput(payload)) },
+      30000,
+    );
+    if (!created.ok) return created;
+
+    const sessionId = created.data?.id;
+    if (sessionId == null) {
+      return { ok: true, status: created.status, data: created.data, detail: "session created (no transcript: missing id)" };
+    }
+
+    // 2) Upload the Markdown session log as the transcript.
+    const text = this._transcriptText(payload);
+    const uploaded = await this._request(
+      `/api/campaigns/${cid}/sessions/${encodeURIComponent(sessionId)}/transcript/upload`,
+      { method: "POST", body: JSON.stringify({ text }) },
       60000,
     );
+    if (!uploaded.ok) {
+      // The session exists but the transcript failed — surface it, keep the id.
+      return { ok: false, status: uploaded.status, error: uploaded.error, data: { sessionId } };
+    }
+    return { ok: true, status: uploaded.status, data: { sessionId, transcript: uploaded.data } };
   }
 
   /**
-   * Map our telemetry payload to the TableCodex session create schema.
-   * Known required fields: `title` (string), `sessionNumber` (number).
+   * Map our payload to the TableCodex SessionInput schema
+   * (required: title, sessionNumber; optional: playedAt, status).
    * @param {object} payload
    */
-  _buildSessionBody(payload) {
+  _buildSessionInput(payload) {
     const session = payload?.session ?? {};
     const started = session.startedAt ? new Date(session.startedAt) : new Date();
-    const dateStr = started.toISOString().slice(0, 10);
-    // Derive a stable sequence number from the local session index.
+    // Derive a stable, per-campaign session number from the local index.
     let sessionNumber = 1;
     try {
       const index = getSetting(SETTINGS.SESSION_INDEX) ?? [];
-      const sameCampaign = index.filter((s) => String(s.campaignId ?? "") === String(session.campaignId ?? ""));
+      const sameCampaign = index.filter(
+        (s) => String(s.campaignId ?? "") === String(session.campaignId ?? ""),
+      );
       const pos = sameCampaign.findIndex((s) => s.id === session.id);
       sessionNumber = (pos >= 0 ? pos : sameCampaign.length) + 1;
     } catch {
       /* fall back to 1 */
     }
     return {
-      title: session.title || `${session.worldName || "Foundry"} session — ${dateStr}`,
+      title: session.title || `${session.worldName || "Foundry"} — ${started.toISOString().slice(0, 10)}`,
       sessionNumber,
-      date: dateStr,
-      telemetry: payload,
+      playedAt: started.toISOString(),
+      status: "uploaded",
     };
+  }
+
+  /** Render the transcript text (Markdown) attached to the session. */
+  _transcriptText(payload) {
+    try {
+      return markdownExporter.renderFromPayload(payload);
+    } catch {
+      // Fallback: a minimal text body so the upload still has content.
+      return `# Foundry Session\n\n${payload?.reconstruction?.summary?.eventCount ?? 0} telemetry events captured.`;
+    }
   }
 
   /**

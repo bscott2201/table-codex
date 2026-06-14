@@ -17,6 +17,16 @@ class MarkdownExporter {
    */
   serialize(events) {
     const payload = buildPayload(events);
+    return { md: this.renderFromPayload(payload), payload };
+  }
+
+  /**
+   * Render Markdown from an already-built payload (no reconstruction rebuild).
+   * Used by the upload queue to attach a transcript without recomputing.
+   * @param {import("./payload.js").SessionPayload} payload
+   * @returns {string}
+   */
+  renderFromPayload(payload) {
     const r = payload.reconstruction;
     const lines = [];
 
@@ -73,7 +83,7 @@ class MarkdownExporter {
     }
     lines.push("");
 
-    return { md: lines.join("\n"), payload };
+    return lines.join("\n");
   }
 
   /** One-line description of a combat action. */
