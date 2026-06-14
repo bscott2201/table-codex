@@ -25,16 +25,28 @@ class ApiClient {
     return (getSetting(SETTINGS.API_TOKEN) || "").trim() || null;
   }
 
-  /** Standard headers including auth + module identity. */
-  _headers(extra = {}) {
+  /**
+   * Build request headers. We deliberately keep these to the CORS-"simple" set
+   * plus Authorization: a custom header (e.g. X-TableCodex-Module) forces the
+   * browser to send a preflight that lists it in Access-Control-Request-Headers,
+   * which fails unless the server echoes it in Access-Control-Allow-Headers.
+   * Module identity is sent as a query param instead (see `_url`). Content-Type
+   * is only set when there is a JSON body.
+   * @param {boolean} hasBody
+   * @param {Record<string,string>} [extra]
+   */
+  _headers(hasBody, extra = {}) {
     /** @type {Record<string,string>} */
-    const headers = {
-      "Content-Type": "application/json",
-      "X-TableCodex-Module": `${MODULE_ID}@${MODULE_VERSION}`,
-      ...extra,
-    };
+    const headers = { ...extra };
+    if (hasBody) headers["Content-Type"] = "application/json";
     if (this.token) headers.Authorization = `Bearer ${this.token}`;
     return headers;
+  }
+
+  /** Append the module identity as a preflight-safe query param. */
+  _url(path) {
+    const sep = path.includes("?") ? "&" : "?";
+    return `${this.baseUrl}${path}${sep}module=${encodeURIComponent(`${MODULE_ID}@${MODULE_VERSION}`)}`;
   }
 
   /**
@@ -49,9 +61,9 @@ class ApiClient {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const res = await fetch(`${this.baseUrl}${path}`, {
+      const res = await fetch(this._url(path), {
         ...init,
-        headers: this._headers(init.headers),
+        headers: this._headers(init.body != null, init.headers),
         signal: controller.signal,
       });
       let data = null;
