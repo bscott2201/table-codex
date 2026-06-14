@@ -30,7 +30,7 @@
       <select id="tc-campaignId" name="campaignId">
         <option value="">— select a campaign —</option>
         {{#each campaigns as |c|}}
-          <option value="{{c.id}}" {{#if (tcEq c.id ../campaignId)}}selected{{/if}}>{{c.name}}</option>
+          <option value="{{c.id}}" {{#if c.selected}}selected{{/if}}>{{c.name}}</option>
         {{/each}}
       </select>
     </div>

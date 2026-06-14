@@ -127,17 +127,21 @@ export function registerSettings() {
 }
 
 /**
- * Register the settings-menu button that opens the main panel. The panel class
- * is provided lazily to avoid referencing ApplicationV2 at module-parse time.
+ * Register the settings-menu button that opens the main panel. In Foundry V13+
+ * `registerMenu` requires `type` to be an ApplicationV2 (or FormApplication)
+ * subclass, so the launcher extends ApplicationV2 and overrides render() to open
+ * the real panel instead of rendering itself. Built here (inside init) so
+ * `foundry.applications.api` is only referenced after the core is initialized.
  * @param {() => void} openPanel
  */
 export function registerSettingsMenu(openPanel) {
-  // A minimal FormApplication-free launcher: registerMenu requires a class with
-  // a render method. We use an ApplicationV2-compatible thunk via a tiny shim.
-  class PanelLauncher {
-    constructor() {}
-    render() {
+  const Base = foundry.applications.api.ApplicationV2;
+  class PanelLauncher extends Base {
+    async render() {
       openPanel();
+      return this;
+    }
+    async close() {
       return this;
     }
   }
