@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.6.3 — Correct TableCodex API Endpoints
+
+Aligned the API client with the actual TableCodex routes (the previous `/api/ping`
+and `/api/sessions` paths returned 404):
+
+- **Test connection** now hits `GET /api/me` (200 = connected, 401 = invalid/missing token) — there is no public health endpoint; unknown paths fall through to the SPA.
+- **List campaigns** stays on `GET /api/campaigns` (correct).
+- **Session sync** moved to `POST /api/campaigns/:campaignId/sessions` (campaignId is numeric server-side). The body is mapped to the TableCodex session schema — required `title` (string) and `sessionNumber` (number), with the full telemetry payload attached under `telemetry`. `sessionNumber` is derived from the local session index.
+- **Sync status** now lists `GET /api/campaigns/:campaignId/sessions`.
+
+Note: the session body beyond `title`/`sessionNumber` is best-effort; if the server schema adds required fields, update `_buildSessionBody` in `scripts/export/api-client.js`.
+
 ## 0.6.2 — CORS-Safe API Requests
 
 - Removed the custom `X-TableCodex-Module` request header, which forced a CORS preflight that failed unless the server echoed it in `Access-Control-Allow-Headers` (the cause of the `x-tablecodex-module is not allowed` error). Module identity is now sent as a preflight-safe `?module=tablecodex-sync@<version>` query param.
