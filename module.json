@@ -1,19 +1,19 @@
 {
   "id": "tablecodex-sync",
   "title": "TableCodex Sync",
-  "description": "Capture Foundry session activity and export/sync to TableCodex.",
-  "version": "0.5.1",
+  "description": "Production-grade session telemetry capture, combat reconstruction, and export/sync for TableCodex. D&D5e-first, with optional Midi-QOL enrichment.",
+  "version": "0.6.0",
   "authors": [
     {
       "name": "TableCodex"
     }
   ],
   "compatibility": {
-    "minimum": "14",
+    "minimum": "13",
     "verified": "14"
   },
   "esmodules": [
-    "scripts/main.js"
+    "scripts/tablecodex-sync.js"
   ],
   "styles": [
     "styles/tablecodex-sync.css"
@@ -25,6 +25,35 @@
       "path": "lang/en.json"
     }
   ],
+  "relationships": {
+    "requires": [
+      {
+        "id": "lib-wrapper",
+        "type": "module",
+        "compatibility": {}
+      },
+      {
+        "id": "socketlib",
+        "type": "module",
+        "compatibility": {}
+      }
+    ],
+    "recommends": [
+      {
+        "id": "midi-qol",
+        "type": "module",
+        "reason": "Enables high-fidelity attack/damage/save telemetry when present (optional)."
+      }
+    ],
+    "systems": [
+      {
+        "id": "dnd5e",
+        "type": "system",
+        "reason": "Phase 3 activity/spell/weapon/feature/resource telemetry is D&D5e-specific. Core telemetry (HP, movement, conditions, combat, rolls) is system-agnostic."
+      }
+    ]
+  },
+  "socket": true,
   "manifest": "https://raw.githubusercontent.com/bscott2201/table-codex/main/module.json",
   "download": "https://github.com/bscott2201/table-codex/archive/refs/heads/main.zip"
 }

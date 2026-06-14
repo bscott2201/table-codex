@@ -1,0 +1,46 @@
+{{!-- TableCodex Sync — main panel (ApplicationV2 HandlebarsApplicationMixin) --}}
+<section class="tablecodex-panel">
+
+  <header class="tc-status {{#if active}}tc-active{{/if}}">
+    <i class="fa-solid {{#if active}}fa-circle-dot{{else}}fa-circle{{/if}}"></i>
+    <span class="tc-status-label">
+      {{#if active}}Recording session{{else}}Idle{{/if}}
+    </span>
+    {{#if sessionId}}<code class="tc-session-id">{{sessionId}}</code>{{/if}}
+  </header>
+
+  <div class="tc-grid">
+    <div class="tc-stat"><span class="tc-stat-label">World</span><span>{{worldName}}</span></div>
+    <div class="tc-stat"><span class="tc-stat-label">System</span><span>{{systemId}}</span></div>
+    <div class="tc-stat"><span class="tc-stat-label">Events</span><span>{{eventCount}}</span></div>
+    <div class="tc-stat">
+      <span class="tc-stat-label">Campaign</span>
+      <span>{{#if campaignName}}{{campaignName}}{{else if campaignId}}{{campaignId}}{{else}}<em>not linked</em>{{/if}}</span>
+    </div>
+  </div>
+
+  <div class="tc-actions">
+    {{#unless active}}
+      <button type="button" data-action="startSession"><i class="fa-solid fa-play"></i> Start session</button>
+    {{else}}
+      <button type="button" data-action="stopSession"><i class="fa-solid fa-stop"></i> Stop session</button>
+    {{/unless}}
+    <button type="button" data-action="linkCampaign"><i class="fa-solid fa-link"></i> Link campaign</button>
+  </div>
+
+  <h3 class="tc-section">Export</h3>
+  <div class="tc-actions">
+    <button type="button" data-action="exportJson"><i class="fa-solid fa-file-code"></i> Export JSON</button>
+    <button type="button" data-action="exportMarkdown"><i class="fa-solid fa-file-lines"></i> Export Markdown</button>
+  </div>
+
+  <h3 class="tc-section">Sync</h3>
+  <div class="tc-sync">
+    <span>Queue: <strong>{{queuePending}}</strong> pending{{#if queueFailed}}, <strong class="tc-failed">{{queueFailed}}</strong> failed{{/if}}</span>
+    <button type="button" data-action="syncNow" {{#unless apiUrl}}disabled{{/unless}}>
+      <i class="fa-solid fa-cloud-arrow-up"></i> Sync now
+    </button>
+  </div>
+  {{#unless apiUrl}}<p class="tc-hint">Set an API URL via “Link campaign” to enable sync.</p>{{/unless}}
+
+</section>
