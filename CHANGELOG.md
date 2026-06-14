@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.7.0 — Use the Foundry Integration API
+
+TableCodex exposes a purpose-built Foundry integration API (`/api/integrations/foundry/*`, tag `foundry`) designed for exactly this module. Repointed the client to it — it takes our structured telemetry directly, so the generic sessions/transcript workaround is gone.
+
+- **Auth:** module token is a `Bearer ftx_...` API key generated in TableCodex (`POST /campaigns/:id/foundry/token`). CORS for these routes is already configured server-side (preflight returns 204 with the Foundry origin + `Authorization` allowed).
+- **Test connection** → `GET /api/integrations/foundry/ping` (validates connectivity, CORS, and token; no campaign needed). Reports token type/scopes.
+- **Load campaigns** → `GET /api/integrations/foundry/campaigns` (`FoundryCampaignsResponse`), normalized to `{id, name, system}`.
+- **Connect** → `POST /api/integrations/foundry/connect` (`FoundryConnectInput`) registers/refreshes the world connection; called best-effort before each import.
+- **Sync** → `POST /api/integrations/foundry/session-import` (`FoundryImportPayload`). We send the full `rawEvents` envelope log plus derived `rolls`, `combats`, and `actors`, with world/system/version metadata. Returns `FoundrySyncStatusResponse` (`importId`, `status`, `sessionId`). `campaignId` is coerced to a number.
+- **Status** → `GET /api/integrations/foundry/sync-status?importId=N`.
+- Removed the transcript-upload path and its markdown-exporter coupling from the API client.
+
 ## 0.6.4 — Match the TableCodex Session Schema (fix 500 on sync)
 
 Read the published OpenAPI spec (`/api/docs/openapi.yaml`) and aligned sync with the real contract. The previous body sent extra `telemetry`/`date` keys to session-create, causing a 500.

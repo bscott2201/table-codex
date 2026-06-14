@@ -16,7 +16,7 @@ export const MODULE_TITLE = "TableCodex Sync";
  * Module version. Kept in sync with module.json by convention (the project
  * bumps module.json, this constant, and CHANGELOG.md on every change).
  */
-export const MODULE_VERSION = "0.6.4";
+export const MODULE_VERSION = "0.7.0";
 
 /** Envelope schema version. Bump when the event envelope shape changes. */
 export const ENVELOPE_SCHEMA = 1;
