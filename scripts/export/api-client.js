@@ -82,6 +82,25 @@ class ApiClient {
   }
 
   /**
+   * List the campaigns available to this token, for selection in the link UI.
+   * GET /api/campaigns. Normalizes the response to `data: [{id, name}]`.
+   * @returns {Promise<ApiResult>}
+   */
+  async listCampaigns() {
+    if (!this.baseUrl) return { ok: false, error: "API URL not configured" };
+    const result = await this._request("/api/campaigns", { method: "GET" });
+    if (result.ok) {
+      const raw = Array.isArray(result.data) ? result.data : result.data?.campaigns ?? [];
+      result.data = raw.map((c) => ({
+        id: c.id ?? c.campaignId ?? c._id ?? "",
+        name: c.name ?? c.title ?? c.id ?? "(unnamed)",
+      }));
+    }
+    logger.debug("api-client: listCampaigns", result.ok, result.data?.length ?? 0);
+    return result;
+  }
+
+  /**
    * Push a session payload. POST /api/sessions.
    * @param {object} payload  Output of buildPayload().
    * @returns {Promise<ApiResult>}

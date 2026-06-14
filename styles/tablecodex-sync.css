@@ -95,6 +95,31 @@
   gap: 0.2rem;
 }
 
-.tablecodex-campaign-link input {
+.tablecodex-campaign-link input,
+.tablecodex-campaign-link select {
   width: 100%;
+}
+
+.tablecodex-campaign-link .tc-conn-actions button {
+  flex: 1 1 auto;
+}
+
+.tablecodex-campaign-link .tc-conn-status {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0.35rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.85em;
+}
+
+.tablecodex-campaign-link .tc-conn-status.tc-ok {
+  background: rgba(40, 160, 80, 0.15);
+  color: #1e7a3c;
+}
+
+.tablecodex-campaign-link .tc-conn-status.tc-err {
+  background: rgba(192, 57, 43, 0.12);
+  color: #c0392b;
 }
