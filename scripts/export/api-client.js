@@ -10,7 +10,6 @@
 import { MODULE_ID, MODULE_VERSION, SETTINGS } from "../core/constants.js";
 import { logger } from "../core/logger.js";
 import { getSetting } from "../core/settings.js";
-import { markdownExporter } from "./markdown-exporter.js";
 
 /** @typedef {{ ok: boolean, status?: number, detail?: string, error?: string, data?: any }} ApiResult */
 
@@ -86,37 +85,39 @@ class ApiClient {
   }
 
   /**
-   * Verify connectivity + auth against the real API. There is no public health
-   * endpoint (the SPA catch-all serves HTML for unknown paths), so we hit the
-   * authenticated `GET /api/me` and treat 200 as connected, 401 as a bad/missing
-   * token.
+   * Verify connectivity, CORS, and token validity via the purpose-built Foundry
+   * module endpoint `GET /api/integrations/foundry/ping` (no campaign required).
+   * The Foundry token is a `Bearer ftx_...` API key generated in TableCodex.
    */
   async testConnection() {
     if (!this.baseUrl) return { ok: false, error: "API URL not configured" };
-    const result = await this._request("/api/me", { method: "GET" });
-    if (result.ok) {
-      const u = result.data ?? {};
-      result.detail = u.email ?? u.username ?? u.name ?? "authenticated";
+    const result = await this._request("/api/integrations/foundry/ping", { method: "GET" });
+    if (result.ok && result.data?.success) {
+      const d = result.data;
+      result.detail = `${d.tokenType ?? "token"}${d.scopes?.length ? ` [${d.scopes.join(", ")}]` : ""}`;
     } else if (result.status === 401) {
-      result.error = "invalid or missing API token";
+      result.ok = false;
+      result.error = result.data?.error ?? "invalid or missing Foundry token (Bearer ftx_...)";
     }
     logger.debug("api-client: testConnection", result.ok);
     return result;
   }
 
   /**
-   * List the campaigns available to this token, for selection in the link UI.
-   * GET /api/campaigns. Normalizes the response to `data: [{id, name}]`.
+   * List campaigns this Foundry token can access, for selection in the link UI.
+   * `GET /api/integrations/foundry/campaigns` → FoundryCampaignsResponse.
+   * Normalized to `data: [{ id, name, system }]`.
    * @returns {Promise<ApiResult>}
    */
   async listCampaigns() {
     if (!this.baseUrl) return { ok: false, error: "API URL not configured" };
-    const result = await this._request("/api/campaigns", { method: "GET" });
+    const result = await this._request("/api/integrations/foundry/campaigns", { method: "GET" });
     if (result.ok) {
-      const raw = Array.isArray(result.data) ? result.data : result.data?.campaigns ?? [];
+      const raw = result.data?.campaigns ?? (Array.isArray(result.data) ? result.data : []);
       result.data = raw.map((c) => ({
-        id: c.id ?? c.campaignId ?? c._id ?? "",
-        name: c.name ?? c.title ?? c.id ?? "(unnamed)",
+        id: c.id ?? "",
+        name: c.name ?? `Campaign ${c.id}`,
+        system: c.system ?? null,
       }));
     }
     logger.debug("api-client: listCampaigns", result.ok, result.data?.length ?? 0);
@@ -124,100 +125,101 @@ class ApiClient {
   }
 
   /**
-   * Push a session to TableCodex. Per the API contract this is a two-step flow:
-   *   1. `POST /api/campaigns/:campaignId/sessions` with SessionInput
-   *      ({ title, sessionNumber, playedAt?, status? }) → returns the new session id.
-   *   2. `POST /api/campaigns/:campaignId/sessions/:sessionId/transcript/upload`
-   *      with { text } → attaches the human-readable session log (the server then
-   *      sets status to "transcribed" and can run AI extraction).
-   *
-   * The session-create schema has no telemetry field, so the rich telemetry is
-   * delivered as the transcript text (Markdown). The full JSON payload remains
-   * available via the JSON exporter / local store.
+   * Register or update this Foundry world connection.
+   * `POST /api/integrations/foundry/connect` (FoundryConnectInput).
+   * @param {{campaignId?:string|number, foundryWorldId:string, foundryWorldName:string, systemId?:string, foundryVersion?:string, moduleVersion?:string}} input
+   * @returns {Promise<ApiResult>}
+   */
+  async connectWorld(input) {
+    if (!input?.foundryWorldId || !input?.foundryWorldName) {
+      return { ok: false, error: "world id/name required to connect" };
+    }
+    return this._request(
+      "/api/integrations/foundry/connect",
+      { method: "POST", body: JSON.stringify(input) },
+      30000,
+    );
+  }
+
+  /**
+   * Push a session import. The Foundry integration endpoint accepts our
+   * structured telemetry directly (incl. a `rawEvents` array), so there is no
+   * transcript hack — the server processes the import server-side.
+   * `POST /api/integrations/foundry/session-import` → FoundrySyncStatusResponse.
    * @param {object} payload  Output of buildPayload().
    * @returns {Promise<ApiResult>}
    */
   async syncSession(payload) {
-    const campaignId = (getSetting(SETTINGS.CAMPAIGN_ID) || "").toString().trim();
-    if (!campaignId) return { ok: false, error: "no campaign linked" };
-    const cid = encodeURIComponent(campaignId);
+    if (!this.baseUrl) return { ok: false, error: "API URL not configured" };
+    const body = this._buildImportPayload(payload);
+    if (!body.foundryWorldId) return { ok: false, error: "missing foundry world id" };
 
-    // 1) Create the session record.
-    const created = await this._request(
-      `/api/campaigns/${cid}/sessions`,
-      { method: "POST", body: JSON.stringify(this._buildSessionInput(payload)) },
-      30000,
+    // Best-effort: register/refresh the world connection first (idempotent).
+    await this.connectWorld({
+      campaignId: body.campaignId,
+      foundryWorldId: body.foundryWorldId,
+      foundryWorldName: body.foundryWorldName,
+      systemId: body.systemId,
+      foundryVersion: body.foundryVersion,
+      moduleVersion: body.moduleVersion,
+    }).catch(() => {});
+
+    const result = await this._request(
+      "/api/integrations/foundry/session-import",
+      { method: "POST", body: JSON.stringify(body) },
+      120000,
     );
-    if (!created.ok) return created;
-
-    const sessionId = created.data?.id;
-    if (sessionId == null) {
-      return { ok: true, status: created.status, data: created.data, detail: "session created (no transcript: missing id)" };
+    if (result.ok) {
+      logger.info(`api-client: import accepted (importId ${result.data?.importId}, ${result.data?.status})`);
     }
-
-    // 2) Upload the Markdown session log as the transcript.
-    const text = this._transcriptText(payload);
-    const uploaded = await this._request(
-      `/api/campaigns/${cid}/sessions/${encodeURIComponent(sessionId)}/transcript/upload`,
-      { method: "POST", body: JSON.stringify({ text }) },
-      60000,
-    );
-    if (!uploaded.ok) {
-      // The session exists but the transcript failed — surface it, keep the id.
-      return { ok: false, status: uploaded.status, error: uploaded.error, data: { sessionId } };
-    }
-    return { ok: true, status: uploaded.status, data: { sessionId, transcript: uploaded.data } };
+    return result;
   }
 
   /**
-   * Map our payload to the TableCodex SessionInput schema
-   * (required: title, sessionNumber; optional: playedAt, status).
+   * Map our payload (buildPayload output) to FoundryImportPayload. Required:
+   * `foundryWorldId`. We send the full raw envelope log plus a few derived
+   * arrays the server understands.
    * @param {object} payload
    */
-  _buildSessionInput(payload) {
+  _buildImportPayload(payload) {
     const session = payload?.session ?? {};
-    const started = session.startedAt ? new Date(session.startedAt) : new Date();
-    // Derive a stable, per-campaign session number from the local index.
-    let sessionNumber = 1;
-    try {
-      const index = getSetting(SETTINGS.SESSION_INDEX) ?? [];
-      const sameCampaign = index.filter(
-        (s) => String(s.campaignId ?? "") === String(session.campaignId ?? ""),
-      );
-      const pos = sameCampaign.findIndex((s) => s.id === session.id);
-      sessionNumber = (pos >= 0 ? pos : sameCampaign.length) + 1;
-    } catch {
-      /* fall back to 1 */
-    }
+    const recon = payload?.reconstruction ?? {};
+    const events = payload?.rawEvents ?? [];
+    const campaignIdRaw = (getSetting(SETTINGS.CAMPAIGN_ID) || "").toString().trim();
+    const campaignId = campaignIdRaw ? Number(campaignIdRaw) : undefined;
+
+    const rolls = events.filter((e) => e.eventType === "roll").map((e) => e.metadata);
+    const actors = Object.values(recon.actors ?? {});
+
     return {
-      title: session.title || `${session.worldName || "Foundry"} — ${started.toISOString().slice(0, 10)}`,
-      sessionNumber,
-      playedAt: started.toISOString(),
-      status: "uploaded",
+      ...(Number.isFinite(campaignId) ? { campaignId } : {}),
+      foundryWorldId: session.worldId ?? getSetting(SETTINGS.WORLD_ID) ?? "",
+      foundryWorldName: session.worldName ?? getSetting(SETTINGS.WORLD_NAME) ?? "",
+      localSessionId: session.id ?? recon.sessionId ?? null,
+      startedAt: recon.startedAt ?? session.startedAt ?? null,
+      endedAt: recon.endedAt ?? null,
+      foundryVersion: session.foundryVersion ?? game.version ?? null,
+      systemId: session.systemId ?? game.system?.id ?? null,
+      moduleVersion: session.moduleVersion ?? MODULE_VERSION,
+      rawEvents: events,
+      rolls,
+      combats: recon.combats ?? [],
+      actors,
     };
   }
 
-  /** Render the transcript text (Markdown) attached to the session. */
-  _transcriptText(payload) {
-    try {
-      return markdownExporter.renderFromPayload(payload);
-    } catch {
-      // Fallback: a minimal text body so the upload still has content.
-      return `# Foundry Session\n\n${payload?.reconstruction?.summary?.eventCount ?? 0} telemetry events captured.`;
-    }
-  }
-
   /**
-   * List sessions already recorded for the linked campaign.
-   * `GET /api/campaigns/:campaignId/sessions`.
+   * Get import processing status.
+   * `GET /api/integrations/foundry/sync-status?importId=N`.
+   * @param {number|string} importId
    * @returns {Promise<ApiResult>}
    */
-  async getSyncStatus() {
-    const campaignId = (getSetting(SETTINGS.CAMPAIGN_ID) || "").toString().trim();
-    if (!campaignId) return { ok: false, error: "no campaign linked" };
-    return this._request(`/api/campaigns/${encodeURIComponent(campaignId)}/sessions`, {
-      method: "GET",
-    });
+  async getSyncStatus(importId) {
+    if (importId == null) return { ok: false, error: "importId required" };
+    return this._request(
+      `/api/integrations/foundry/sync-status?importId=${encodeURIComponent(importId)}`,
+      { method: "GET" },
+    );
   }
 }
 
