@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.2 — Actually enqueue sessions for sync
+
+Sync never happened because nothing was ever placed on the upload queue: `sessionManager.stop()` flushed and indexed events but never enqueued, and the "Sync now" button only drained an always-empty queue (hence "zero pending" and the dead button).
+
+- **Stopping a session now auto-enqueues it** for sync (GM only), via a `SESSION_STOPPED` handler that calls `uploadQueue.enqueueCurrentSession()`; `enqueue` immediately kicks a `process()` pass, so a configured + reachable API syncs right away.
+- **`uploadQueue.syncNow()`** added: ensures the current session is queued (dedup-guarded), then processes. The panel "Sync now" button calls it and now reports a result (syncing / complete / failed / not configured).
+- **Dedup:** a session already queued or already marked `synced` in the index is not re-enqueued, so the event store retaining its buffer after stop can't cause duplicate imports.
+
 ## 0.7.1 — Fix "Missing helper: tcEq" on the campaign-link window
 
 The `init` hook registered the settings menu before the Handlebars helpers, and in Foundry V13+ `registerMenu` rejected the plain launcher class (menu `type` must be an ApplicationV2/FormApplication subclass). That threw mid-`init`, so the `tcEq` helper never registered and the campaign-link template failed to render.

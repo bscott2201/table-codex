@@ -12,6 +12,8 @@ import { randomId, isActiveGM } from "../core/util.js";
 import { logger } from "../core/logger.js";
 import { getSetting, setSetting } from "../core/settings.js";
 import { apiClient } from "./api-client.js";
+import { buildPayload } from "./payload.js";
+import { eventStore } from "../bus/event-store.js";
 
 const MAX_ATTEMPTS = 6;
 const BASE_BACKOFF_MS = 5000;
@@ -33,6 +35,8 @@ class UploadQueue {
     this._processing = false;
     /** @type {ReturnType<typeof setInterval>|null} */
     this._timer = null;
+    /** Session ids enqueued this client-session (dedup; resets on reload). */
+    this._enqueued = new Set();
   }
 
   /** Start the periodic processing loop (GM only). */
@@ -54,6 +58,46 @@ class UploadQueue {
   async _write(queue) {
     await setSetting(SETTINGS.UPLOAD_QUEUE, queue);
     Hooks.callAll?.(HOOKS.QUEUE_CHANGED, this.snapshot());
+  }
+
+  /**
+   * Build a payload from the current event store and enqueue it. Used on session
+   * stop and by the "Sync now" button. No-op if there are no events.
+   * @returns {Promise<QueueEntry|null>}
+   */
+  async enqueueCurrentSession() {
+    if (!isActiveGM()) return null;
+    if (eventStore.size === 0) {
+      logger.debug("upload-queue: nothing to enqueue (empty event store)");
+      return null;
+    }
+    const payload = buildPayload();
+    const sid = payload.session?.id;
+    // Dedup: skip if this session is already queued or was already synced.
+    if (sid) {
+      if (this._enqueued.has(sid)) return null;
+      if (this._read().some((e) => e.sessionId === sid)) return null;
+      const index = getSetting(SETTINGS.SESSION_INDEX) ?? [];
+      if (index.find((s) => s.id === sid && s.synced)) return null;
+    }
+    logger.info(`upload-queue: enqueuing session ${sid} (${payload.rawEvents.length} events)`);
+    const entry = await this.enqueue(payload);
+    if (sid) this._enqueued.add(sid);
+    return entry;
+  }
+
+  /**
+   * "Sync now": ensure the current session is queued (dedup-guarded), then
+   * process. This is what the panel button calls so a sync works even when
+   * nothing was auto-enqueued yet.
+   * @returns {Promise<{ snapshot: ReturnType<UploadQueue["snapshot"]>, error?: string }>}
+   */
+  async syncNow() {
+    if (!isActiveGM()) return { snapshot: this.snapshot(), error: "GM only" };
+    if (!apiClient.baseUrl) return { snapshot: this.snapshot(), error: "API URL not configured" };
+    await this.enqueueCurrentSession();
+    await this.process();
+    return { snapshot: this.snapshot() };
   }
 
   /**

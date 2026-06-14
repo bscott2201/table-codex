@@ -192,8 +192,18 @@ async function _onReady() {
 
     // UI refresh on session lifecycle changes.
     Hooks.on(HOOKS.SESSION_STARTED, refreshPanel);
-    Hooks.on(HOOKS.SESSION_STOPPED, refreshPanel);
     Hooks.on(HOOKS.SESSION_RESUMED, refreshPanel);
+
+    // On stop, auto-enqueue the finished session for sync (GM only), then refresh.
+    Hooks.on(HOOKS.SESSION_STOPPED, async () => {
+      try {
+        if (isActiveGM()) await uploadQueue.enqueueCurrentSession();
+      } catch (err) {
+        logger.error("ready: auto-enqueue on session stop failed", err);
+      } finally {
+        refreshPanel();
+      }
+    });
 
     // GM housekeeping: forward any buffered player events, repaint controls.
     if (isActiveGM()) {
