@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.1 — Campaign Selection in Link UI
+
+- **Test connection** now reports an inline result (success/error) in the campaign-link window, in addition to the notification.
+- **Load campaigns**: new button fetches the campaign list from the API (`GET /api/campaigns` via `apiClient.listCampaigns()`) and presents them in a dropdown, so the campaign id no longer has to be typed by hand. Falls back to manual id/name entry when none are loaded.
+- The link form persists the typed API URL/token before testing or loading, so you can fetch without saving first. On save, the campaign name is resolved automatically from the selected campaign.
+
 ## 0.6.0 — Full Modular Rebuild (Telemetry Pipeline + Reconstruction)
 
 Complete ground-up rebuild of the module into a modular, production-grade
