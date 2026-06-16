@@ -116,6 +116,10 @@ class SessionManager {
 
     eventBus.emit(
       buildEvent(EVENT_TYPES.SESSION_STOP, {
+        // Stamp the sessionId explicitly: we just set active=false, so the
+        // envelope factory's getter would otherwise resolve "unbound" and orphan
+        // the stop event from its own session.
+        sessionId: this.meta.id,
         metadata: { id: this.meta.id, endedAt: this.meta.endedAt, seq: currentSeq() },
       }),
     );

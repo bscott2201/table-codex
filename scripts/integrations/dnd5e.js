@@ -97,6 +97,31 @@ export function resolveActivityContext(activityOrItem) {
   };
 }
 
+/**
+ * Stable correlation id for one item's use, shared by EVERY capture module that
+ * observes the same activity (activity-use, spell, weapon, feature) and by the
+ * Midi enrichment layer. This is what lets the best-effort dnd5e events and the
+ * high-fidelity Midi workflow events for a single action be joined downstream
+ * (the "supersede" design): they all carry the same key.
+ *
+ * It is derived from the ITEM id rather than a per-use nonce on purpose. The
+ * dnd5e activity hooks (`postUseActivity`, `rollAttackV2`, …) and the Midi
+ * workflow hooks fire from independent dispatches with no shared per-use token,
+ * so an item-stable key is the most reliable thing both sides can compute. The
+ * tradeoff: multiple uses of the SAME item within a session share a correlation
+ * group — downstream can split them by `seq`/timestamp proximity. This matches
+ * Midi's own scheme, so aligning everyone to it keeps the whole pipeline
+ * consistent rather than inventing a competing id.
+ * @param {*} activityOrItem  An Activity, item, or Midi workflow (anything
+ *   `resolveActivityContext` understands).
+ * @returns {string|null} `act_<itemId>` or null when no item id is resolvable.
+ */
+export function activityCorrelationId(activityOrItem) {
+  const ctx = resolveActivityContext(activityOrItem);
+  const id = ctx.item?.id ?? null;
+  return id ? `act_${id}` : null;
+}
+
 /** Classify a dnd5e item by its type into our coarse buckets. */
 export function classifyItem(item) {
   const type = item?.type ?? null;

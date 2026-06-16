@@ -78,13 +78,13 @@ export function applyEvent(stateMap, event) {
       return { actorId, before, after: { ...s.hp } };
     }
     case EVENT_TYPES.CONDITION_ADD: {
-      const s = ensureActor(stateMap, actorId);
+      const s = ensureActor(stateMap, actorId, metadata?.actorName);
       const names = metadata?.statuses?.length ? metadata.statuses : [metadata?.name];
       for (const n of names) if (n && !s.conditions.includes(n)) s.conditions.push(n);
       return { actorId, before: null, after: s.conditions.slice() };
     }
     case EVENT_TYPES.CONDITION_REMOVE: {
-      const s = ensureActor(stateMap, actorId);
+      const s = ensureActor(stateMap, actorId, metadata?.actorName);
       const names = metadata?.statuses?.length ? metadata.statuses : [metadata?.name];
       s.conditions = s.conditions.filter((c) => !names.includes(c));
       return { actorId, before: null, after: s.conditions.slice() };

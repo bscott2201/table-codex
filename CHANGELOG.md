@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.7.3 — Correlation, round numbering, and spell-level fidelity
+
+Fixes surfaced by analyzing a real captured session (dnd5e 5.3.3 / Foundry 14 / Midi active).
+
+- **Unified correlation ids.** A single `activityCorrelationId()` helper in `integrations/dnd5e.js` now produces the same `act_<itemId>` key for every event describing one use — `dnd5e.activity.use`, `dnd5e.spell.cast`, `dnd5e.weapon.attack`, `dnd5e.feature.use`, and the Midi `midi.*` workflow trio. Previously `activity.use` appended a timestamp (so it never matched Midi), and spell/weapon/feature emitted **no** correlation id at all, leaving the best-effort native events orphaned from the high-fidelity Midi enrichment. They now join. (Known tradeoff: multiple uses of the same item in a session share a group; downstream can split by `seq`/timestamp.)
+- **Correct combat round numbering.** The reconstructor seeds the opening round as 1 (Foundry reports round 0 pre-first-round) and derives round buckets from each `combat.turn`'s own `round` field, so turns are no longer all collapsed into a single mislabeled "round 0". `combat.round` events (which don't fire reliably across versions, and never for the opening round) are still honored but no longer required.
+- **Spell cast level parsed to an integer.** dnd5e 5.x reports the consumed slot as a key string (`"spell2"`); `spell-capture` now extracts the numeric level, so `castLevel` is a real number and `upcast` is computed correctly instead of resolving to `NaN`/null.
+- **`session.stop` keeps its sessionId.** The stop event is stamped with the explicit session id (the active flag is cleared first, which previously made the envelope factory resolve `"unbound"` and orphan the event).
+- **Conditions carry the owning actor's name**, so NPCs touched only by a condition (charmed/paralyzed enemies) are named in the reconstruction instead of appearing as `null`.
+- **Midi save + per-target damage enrichment.** The Midi layer now emits the previously-declared-but-unused `midi.save` event (save DC, ability, and per-target pass/fail + roll), and `midi.workflow`/`midi.attack`/`midi.damage` carry **per-target applied damage** (after resistance/vulnerability and save-for-half) with HP before/after, sourced from `workflow.damageList`. Previously a Fireball dealing 26 to a failed target and 13 to one that saved was indistinguishable — both showed only `saved: true/false`. Save-spell sentinels are also normalized (`attackTotal` of Midi's `-100` → `null`; added `isSave`/`hasAttack` flags).
+
 ## 0.7.2 — Actually enqueue sessions for sync
 
 Sync never happened because nothing was ever placed on the upload queue: `sessionManager.stop()` flushed and indexed events but never enqueued, and the "Sync now" button only drained an always-empty queue (hence "zero pending" and the dead button).

@@ -9,7 +9,7 @@
 
 import { EVENT_TYPES } from "../core/constants.js";
 import { logger } from "../core/logger.js";
-import { emitsHook, resolveActivityContext } from "../integrations/dnd5e.js";
+import { emitsHook, resolveActivityContext, activityCorrelationId } from "../integrations/dnd5e.js";
 import { canCapture, emit } from "./base.js";
 
 /** Pull the subject (activity/item) out of a dnd5e roll hook's data arg. */
@@ -27,12 +27,14 @@ function rollTotals(rolls) {
 
 function record(kind, rolls, data) {
   if (!canCapture(undefined)) return;
-  const ctx = resolveActivityContext(subjectFrom(data));
+  const subject = subjectFrom(data);
+  const ctx = resolveActivityContext(subject);
   const item = ctx.item;
   emit(EVENT_TYPES.WEAPON_ATTACK, {
     actorId: ctx.actorId,
     tokenId: ctx.tokenId,
     metadata: {
+      correlationId: activityCorrelationId(subject),
       kind, // "attack" | "damage"
       itemId: item?.id ?? null,
       itemName: item?.name ?? null,

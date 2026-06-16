@@ -68,25 +68,40 @@ export function reconstructCombats(events) {
       case EVENT_TYPES.COMBAT_START: {
         const id = event.metadata?.combatId ?? event.id;
         activeCombatId = id;
+        // Foundry reports round 0 before the first round begins; treat anything
+        // <1 as round 1 so the opening round isn't mislabeled "round 0".
+        const startRound = event.metadata?.round > 0 ? event.metadata.round : 1;
         combats.set(id, {
           combatId: id,
           sceneId: event.metadata?.sceneId ?? null,
           startedAt: event.timestamp,
           endedAt: null,
           combatants: event.metadata?.combatants ?? [],
-          rounds: [newRound(event.metadata?.round ?? 1)],
+          rounds: [newRound(startRound)],
         });
         break;
       }
       case EVENT_TYPES.COMBAT_ROUND: {
+        // Explicit round-advance (fires on wrap to the next round). Idempotent:
+        // ensureRound below also creates rounds from turn metadata, so we only
+        // push here if this round number isn't already open.
         const c = currentCombat();
-        if (c) c.rounds.push(newRound(event.metadata?.round ?? c.rounds.length + 1));
+        const n = event.metadata?.round ?? (currentRound()?.round ?? 0) + 1;
+        if (c && currentRound()?.round !== n) c.rounds.push(newRound(n));
         break;
       }
       case EVENT_TYPES.COMBAT_TURN: {
         const c = currentCombat();
-        const r = currentRound();
-        if (c && r) {
+        if (c) {
+          // Drive rounds off the turn's own round number. `combat.round` does not
+          // fire reliably across Foundry/dnd5e versions (and never fires for the
+          // opening round), so trusting only it left every turn in one bucket.
+          const evtRound = event.metadata?.round ?? currentRound()?.round ?? 1;
+          let r = currentRound();
+          if (!r || r.round !== evtRound) {
+            r = newRound(evtRound);
+            c.rounds.push(r);
+          }
           const combatant = event.metadata?.activeCombatant
             ? {
                 id: event.metadata.activeCombatant.id,
