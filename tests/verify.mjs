@@ -160,5 +160,59 @@ console.log("\n[6] Event store records + flushes (GM authoritative)");
   ok(stored && stored.events.length === 1, "buffer flushed to persisted setting");
 }
 
+console.log("\n[7] Combat round numbering (driven by turn metadata)");
+{
+  resetSeq(0);
+  const mk = (type, opts) => buildEvent(type, opts);
+  // combat.start reports round 0 (pre-first-round); no combat.round events fire;
+  // turns carry their own round number and cross from round 1 into round 2.
+  const events = [
+    mk(EVENT_TYPES.COMBAT_START, { metadata: { combatId: "cb1", round: 0, combatants: [] } }),
+    mk(EVENT_TYPES.COMBAT_TURN, { actorId: "a1", metadata: { combatId: "cb1", round: 1, turn: 0, activeCombatant: { id: "k1", name: "Hero" } } }),
+    mk(EVENT_TYPES.COMBAT_TURN, { actorId: "a2", metadata: { combatId: "cb1", round: 1, turn: 1, activeCombatant: { id: "k2", name: "Goblin" } } }),
+    mk(EVENT_TYPES.COMBAT_TURN, { actorId: "a1", metadata: { combatId: "cb1", round: 2, turn: 0, activeCombatant: { id: "k1", name: "Hero" } } }),
+    mk(EVENT_TYPES.COMBAT_END, { metadata: { combatId: "cb1" } }),
+  ];
+  const r = reconstructionEngine.reconstruct(events);
+  const combat = r.combats[0];
+  ok(combat.rounds[0].round === 1, "opening round labeled 1 (not 0) despite combat.start round=0");
+  ok(combat.rounds.length === 2, "turns crossing into round 2 create a second round bucket");
+  ok(combat.rounds[0].turns.length === 2 && combat.rounds[1].turns.length === 1, "turns slotted into the correct round");
+}
+
+console.log("\n[8] Midi save + per-target damage enrichment");
+{
+  const { targetSummary, saveSpec, isSaveWorkflow, normAttackTotal } = await import(
+    "../scripts/integrations/midi-qol.js"
+  );
+  // Synthetic Fireball workflow modeled on a real capture: save-for-half, one
+  // target fails (full damage), one saves (half). Sets use object identity, as Midi does.
+  const voidHorror = { id: "tA", actorId: "aA", name: "Void Horror" };
+  const prevail = { id: "tB", actorId: "aB", name: "Prevail" };
+  const workflow = {
+    item: { id: "fb", name: "Fireball" },
+    activity: { save: { dc: { value: 15 }, ability: "dex" } },
+    damageTotal: 26,
+    attackTotal: -100, // Midi "no attack" sentinel for a save spell
+    targets: new Set([voidHorror, prevail]),
+    hitTargets: new Set([voidHorror, prevail]),
+    saves: new Set([prevail]), // only Prevail succeeded
+    damageList: [
+      { tokenId: "tA", actorId: "aA", appliedDamage: 26, oldHP: 30, newHP: 4, saved: false },
+      { tokenId: "tB", actorId: "aB", appliedDamage: 13, oldHP: 40, newHP: 27, saved: true },
+    ],
+  };
+  ok(normAttackTotal(workflow.attackTotal) === null, "save-spell attackTotal sentinel normalized to null");
+  ok(isSaveWorkflow(workflow) === true, "save workflow detected");
+  const spec = saveSpec(workflow);
+  ok(spec.dc === 15 && spec.ability === "dex", "save DC + ability resolved");
+  const ts = targetSummary(workflow);
+  const a = ts.find((t) => t.tokenId === "tA");
+  const b = ts.find((t) => t.tokenId === "tB");
+  ok(a.saved === false && b.saved === true, "per-target save outcome captured");
+  ok(a.appliedDamage === 26 && b.appliedDamage === 13, "per-target APPLIED damage captured (26 vs 13)");
+  ok(b.oldHP === 40 && b.newHP === 27, "per-target HP before/after captured");
+}
+
 console.log(`\n${failed === 0 ? "PASS" : "FAIL"} — ${passed} passed, ${failed} failed\n`);
 process.exit(failed === 0 ? 0 : 1);

@@ -2,7 +2,7 @@
   "id": "tablecodex-sync",
   "title": "TableCodex Sync",
   "description": "Production-grade session telemetry capture, combat reconstruction, and export/sync for TableCodex. D&D5e-first, with optional Midi-QOL enrichment.",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "authors": [
     {
       "name": "TableCodex"

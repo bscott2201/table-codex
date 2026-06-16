@@ -12,26 +12,26 @@
  * independently; this module emits the generic ACTIVITY_USE envelope.
  */
 
-import { EVENT_TYPES, MODULE_ID, FLAGS } from "../core/constants.js";
-import { randomId } from "../core/util.js";
+import { EVENT_TYPES } from "../core/constants.js";
 import { logger } from "../core/logger.js";
 import { wrap } from "../core/libwrapper.js";
-import { isDnd5e, emitsHook, resolveActivityContext, classifyItem } from "../integrations/dnd5e.js";
+import {
+  isDnd5e,
+  emitsHook,
+  resolveActivityContext,
+  classifyItem,
+  activityCorrelationId,
+} from "../integrations/dnd5e.js";
 import { canCapture, emit } from "./base.js";
-
-/** Stamp/read a correlation id so Midi/roll events can be tied together. */
-function correlationId(activity) {
-  const item = activity?.item;
-  // Best-effort stable id; falls back to a fresh random id.
-  return item?.uuid ? `act_${item.id}_${Date.now().toString(36)}` : randomId(12);
-}
 
 /** Build + emit the generic activity-use envelope. */
 export function recordActivityUse(activity, usageConfig, results) {
   if (!canCapture(undefined)) return null;
   const ctx = resolveActivityContext(activity);
   const item = ctx.item;
-  const corr = correlationId(activity);
+  // Shared item-stable id so the Midi workflow + native roll events for this same
+  // use can be joined downstream (see activityCorrelationId).
+  const corr = activityCorrelationId(activity);
 
   return emit(EVENT_TYPES.ACTIVITY_USE, {
     actorId: ctx.actorId,

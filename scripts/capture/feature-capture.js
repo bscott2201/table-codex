@@ -7,7 +7,7 @@
 
 import { EVENT_TYPES } from "../core/constants.js";
 import { logger } from "../core/logger.js";
-import { emitsHook, resolveActivityContext } from "../integrations/dnd5e.js";
+import { emitsHook, resolveActivityContext, activityCorrelationId } from "../integrations/dnd5e.js";
 import { canCapture, emit } from "./base.js";
 import { getProp } from "../core/util.js";
 
@@ -21,6 +21,7 @@ function recordFeature(activity) {
     actorId: ctx.actorId,
     tokenId: ctx.tokenId,
     metadata: {
+      correlationId: activityCorrelationId(activity),
       itemId: item?.id ?? null,
       featureName: item?.name ?? null,
       featureType: getProp(item, "system.type.value") ?? null,
