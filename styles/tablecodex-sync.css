@@ -123,3 +123,62 @@
   background: rgba(192, 57, 43, 0.12);
   color: #c0392b;
 }
+
+/* ── Unified panel: merged connection/campaign section + session name ─────── */
+.tablecodex-panel .tc-session-name {
+  font-weight: 600;
+  margin-left: 0.4rem;
+}
+
+.tablecodex-panel .tc-connection {
+  margin: 0.5rem 0;
+  border: 1px solid var(--color-border-light-tertiary, rgba(0, 0, 0, 0.1));
+  border-radius: 4px;
+  padding: 0.25rem 0.5rem;
+}
+
+.tablecodex-panel .tc-connection > summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 0.25rem 0;
+  list-style-position: inside;
+}
+
+.tablecodex-panel .tc-connection .tc-linked {
+  font-weight: 400;
+  opacity: 0.8;
+}
+
+.tablecodex-panel .tc-connection input,
+.tablecodex-panel .tc-connection select {
+  width: 100%;
+}
+
+.tablecodex-panel .tc-conn-actions button {
+  flex: 1 1 auto;
+}
+
+.tablecodex-panel .tc-conn-status {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.4rem 0 0;
+  padding: 0.35rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.85em;
+}
+
+.tablecodex-panel .tc-conn-status.tc-ok {
+  background: rgba(40, 160, 80, 0.15);
+  color: #1e7a3c;
+}
+
+.tablecodex-panel .tc-conn-status.tc-err {
+  background: rgba(192, 57, 43, 0.12);
+  color: #c0392b;
+}
+
+/* Start-session name dialog */
+.tc-name-dialog input {
+  width: 100%;
+}

@@ -1,11 +1,12 @@
-{{!-- TableCodex Sync — main panel (ApplicationV2 HandlebarsApplicationMixin) --}}
+{{!-- TableCodex Sync — unified control window (session control + campaign linking) --}}
 <section class="tablecodex-panel">
 
   <header class="tc-status {{#if active}}tc-active{{/if}}">
     <i class="fa-solid {{#if active}}fa-circle-dot{{else}}fa-circle{{/if}}"></i>
     <span class="tc-status-label">
-      {{#if active}}Recording session{{else}}Idle{{/if}}
+      {{#if active}}Recording{{else}}Idle{{/if}}
     </span>
+    {{#if sessionName}}<span class="tc-session-name">{{sessionName}}</span>{{/if}}
     {{#if sessionId}}<code class="tc-session-id">{{sessionId}}</code>{{/if}}
   </header>
 
@@ -21,12 +22,68 @@
 
   <div class="tc-actions">
     {{#unless active}}
-      <button type="button" data-action="startSession"><i class="fa-solid fa-play"></i> Start session</button>
+      <button type="button" data-action="startSession" {{#unless linked}}title="Link a campaign below to sync"{{/unless}}>
+        <i class="fa-solid fa-play"></i> Start session…
+      </button>
     {{else}}
       <button type="button" data-action="stopSession"><i class="fa-solid fa-stop"></i> Stop session</button>
     {{/unless}}
-    <button type="button" data-action="linkCampaign"><i class="fa-solid fa-link"></i> Link campaign</button>
   </div>
+
+  {{!-- ── Connection & Campaign (merged from the old link window) ── --}}
+  <details class="tc-connection" {{#if connectionOpen}}open{{/if}}>
+    <summary><i class="fa-solid fa-link"></i> Connection &amp; Campaign{{#if campaignName}} — <span class="tc-linked">{{campaignName}}</span>{{/if}}</summary>
+
+    <p class="tc-hint">Bind this world to a TableCodex campaign. The API token is stored world-scoped.</p>
+
+    <div class="form-group">
+      <label for="tc-apiUrl">API URL</label>
+      <input type="text" id="tc-apiUrl" name="apiUrl" value="{{apiUrl}}" placeholder="https://app.tablecodex.com" />
+    </div>
+
+    <div class="form-group">
+      <label for="tc-apiToken">API Token</label>
+      <input type="password" id="tc-apiToken" name="apiToken" value="{{apiToken}}" placeholder="ftx_…" />
+    </div>
+
+    <div class="tc-actions tc-conn-actions">
+      <button type="button" data-action="testConnection"><i class="fa-solid fa-plug"></i> Test connection</button>
+      <button type="button" data-action="loadCampaigns"><i class="fa-solid fa-rotate"></i> Load campaigns</button>
+    </div>
+
+    {{#if status}}
+      <p class="tc-conn-status {{#if status.ok}}tc-ok{{else}}tc-err{{/if}}">
+        <i class="fa-solid {{#if status.ok}}fa-circle-check{{else}}fa-circle-exclamation{{/if}}"></i>
+        {{status.message}}
+      </p>
+    {{/if}}
+
+    {{#if hasCampaigns}}
+      <div class="form-group">
+        <label for="tc-campaignId">Campaign</label>
+        <select id="tc-campaignId" name="campaignId">
+          <option value="">— select a campaign —</option>
+          {{#each campaigns as |c|}}
+            <option value="{{c.id}}" {{#if c.selected}}selected{{/if}}>{{c.name}}</option>
+          {{/each}}
+        </select>
+      </div>
+    {{else}}
+      <p class="tc-hint">Load campaigns to pick from a list, or enter the id manually below.</p>
+      <div class="form-group">
+        <label for="tc-campaignId-manual">Campaign ID</label>
+        <input type="text" id="tc-campaignId-manual" name="campaignId" value="{{campaignId}}" placeholder="57" />
+      </div>
+      <div class="form-group">
+        <label for="tc-campaignName">Campaign Name</label>
+        <input type="text" id="tc-campaignName" name="campaignName" value="{{campaignName}}" placeholder="Curse of Strahd" />
+      </div>
+    {{/if}}
+
+    <div class="tc-actions">
+      <button type="button" data-action="saveLink"><i class="fa-solid fa-floppy-disk"></i> Save link</button>
+    </div>
+  </details>
 
   <h3 class="tc-section">Export</h3>
   <div class="tc-actions">
@@ -41,6 +98,6 @@
       <i class="fa-solid fa-cloud-arrow-up"></i> Sync now
     </button>
   </div>
-  {{#unless apiUrl}}<p class="tc-hint">Set an API URL via “Link campaign” to enable sync.</p>{{/unless}}
+  {{#unless apiUrl}}<p class="tc-hint">Set an API URL in “Connection &amp; Campaign” above to enable sync.</p>{{/unless}}
 
 </section>

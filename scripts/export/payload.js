@@ -40,6 +40,7 @@ export function buildPayload(events) {
     session: {
       ...(sessionManager.meta ?? {}),
       id: reconstruction.sessionId ?? sessionManager.meta?.id ?? null,
+      title: sessionManager.meta?.title ?? null,
       campaignId: getSetting(SETTINGS.CAMPAIGN_ID) || null,
       campaignName: getSetting(SETTINGS.CAMPAIGN_NAME) || null,
       worldId: getSetting(SETTINGS.WORLD_ID) || reconstruction.worldId,
