@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.4 — One control window + named sessions
+
+- **Single unified window.** Campaign linking is no longer a separate dialog — the API URL/token, Test connection, Load campaigns, and campaign pick/save now live in a collapsible "Connection & Campaign" section inside the main panel. The section auto-opens until a campaign is linked, then collapses. `openCampaignLink()` is kept as an alias that opens the unified panel, so existing macros/module-API callers keep working.
+- **Name your session on start.** "Start session…" now opens a small dialog with a session-name field (prefilled with "<World> — <date>"). The name is stored on the session (`meta.title`), carried in the SESSION_START event and the export payload (`session.title`), and sent to TableCodex (`title` in the import payload) so the web app shows your name instead of the auto "<World> – <date>" title. Dismissing the dialog cancels the start; the API is defensive if `DialogV2` is unavailable.
+
 ## 0.7.3 — Correlation, round numbering, and spell-level fidelity
 
 Fixes surfaced by analyzing a real captured session (dnd5e 5.3.3 / Foundry 14 / Midi active).

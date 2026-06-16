@@ -30,6 +30,7 @@ import { eventStore } from "../bus/event-store.js";
  * @property {string} systemVersion
  * @property {string} foundryVersion
  * @property {string} moduleVersion
+ * @property {string} title            Human-friendly session name (becomes the TableCodex session title).
  * @property {string|null} campaignId
  * @property {{id:string,name:string}[]} users
  */
@@ -52,7 +53,7 @@ class SessionManager {
 
   /**
    * Begin a new capture session. GM-only (the GM is the authoritative writer).
-   * @param {{ campaignId?: string|null }} [opts]
+   * @param {{ campaignId?: string|null, title?: string }} [opts]
    * @returns {Promise<SessionMeta|null>}
    */
   async start(opts = {}) {
@@ -80,6 +81,12 @@ class SessionManager {
       systemVersion: g?.system?.version ?? "",
       foundryVersion: g?.version ?? "",
       moduleVersion: g?.modules?.get?.(MODULE_ID)?.version ?? MODULE_VERSION,
+      // Human-friendly session name. Falls back to "<World> — <date>" when the
+      // start dialog was dismissed without a name. Flows into SESSION_START
+      // metadata and the export payload (session.title) → TableCodex session title.
+      title:
+        (opts.title ?? "").trim() ||
+        `${g?.world?.title ?? "Session"} — ${new Date().toLocaleDateString()}`,
       campaignId: opts.campaignId ?? this._settingCampaignId(),
       users: (g?.users?.contents ?? [])
         .filter((u) => u.active)

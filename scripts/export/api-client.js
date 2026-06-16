@@ -196,6 +196,9 @@ class ApiClient {
       foundryWorldId: session.worldId ?? getSetting(SETTINGS.WORLD_ID) ?? "",
       foundryWorldName: session.worldName ?? getSetting(SETTINGS.WORLD_NAME) ?? "",
       localSessionId: session.id ?? recon.sessionId ?? null,
+      // User-provided session name → TableCodex session title (server uses this
+      // in place of the auto "<World> – <date>" title when present).
+      title: session.title ?? null,
       startedAt: recon.startedAt ?? session.startedAt ?? null,
       endedAt: recon.endedAt ?? null,
       foundryVersion: session.foundryVersion ?? game.version ?? null,
