@@ -11,7 +11,7 @@
  * name becomes the TableCodex session title.
  */
 
-import { MODULE_ID, SETTINGS } from "../core/constants.js";
+import { MODULE_ID, MODULE_VERSION, SETTINGS } from "../core/constants.js";
 import { logger } from "../core/logger.js";
 import { sessionManager } from "../session/session-manager.js";
 import { eventStore } from "../bus/event-store.js";
@@ -227,7 +227,7 @@ function getPanelClass() {
       this.render();
     }
 
-    /** @this {any} Save API creds + campaign selection. */
+    /** @this {any} Save API creds + campaign selection, then register with server. */
     static async _onSaveLink() {
       const root = this.element;
       if (!root) return;
@@ -244,11 +244,34 @@ function getPanelClass() {
       await setSetting(SETTINGS.API_TOKEN, token);
       await setSetting(SETTINGS.CAMPAIGN_ID, campaignId);
       await setSetting(SETTINGS.CAMPAIGN_NAME, campaignName);
-      this._status = {
-        ok: true,
-        message: campaignId ? `Linked to ${campaignName || campaignId}.` : "Saved (no campaign selected).",
-      };
-      ui.notifications?.info("TableCodex: campaign link saved.");
+
+      if (campaignId) {
+        // Register the world connection with the server so the campaign dashboard
+        // shows this world as linked. The server now requires campaignId in the
+        // connect body, so we do this explicitly here rather than waiting for sync.
+        const connectResult = await apiClient.connectWorld({
+          campaignId: Number(campaignId),
+          foundryWorldId: game.world?.id ?? "",
+          foundryWorldName: game.world?.title ?? "",
+          systemId: game.system?.id,
+          foundryVersion: game.version ?? undefined,
+          moduleVersion: MODULE_VERSION,
+        });
+        if (connectResult.ok) {
+          this._status = { ok: true, message: `Linked to ${campaignName || campaignId}.` };
+          ui.notifications?.info("TableCodex: campaign linked and registered with server.");
+        } else {
+          this._status = {
+            ok: false,
+            message: `Settings saved — server registration failed: ${connectResult.error ?? "unknown error"}. Check your API URL and token.`,
+          };
+          ui.notifications?.warn(`TableCodex: ${this._status.message}`);
+        }
+      } else {
+        this._status = { ok: true, message: "Saved (no campaign selected)." };
+        ui.notifications?.info("TableCodex: settings saved.");
+      }
+
       logger.info(`panel: campaign link saved (${campaignId || "none"})`);
       this.render();
     }
