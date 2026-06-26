@@ -127,6 +127,8 @@ class ApiClient {
   /**
    * Register or update this Foundry world connection.
    * `POST /api/integrations/foundry/connect` (FoundryConnectInput).
+   * campaignId is required by the server — falls back to the CAMPAIGN_ID setting
+   * if not supplied in `input`.
    * @param {{campaignId?:string|number, foundryWorldId:string, foundryWorldName:string, systemId?:string, foundryVersion?:string, moduleVersion?:string}} input
    * @returns {Promise<ApiResult>}
    */
@@ -134,11 +136,26 @@ class ApiClient {
     if (!input?.foundryWorldId || !input?.foundryWorldName) {
       return { ok: false, error: "world id/name required to connect" };
     }
+    // campaignId is required by the server — resolve from input or fall back to setting.
+    const rawId = input.campaignId ?? (getSetting(SETTINGS.CAMPAIGN_ID) || "");
+    const campaignId = Number(rawId);
+    if (!Number.isFinite(campaignId) || campaignId <= 0) {
+      return { ok: false, error: "campaign id required to connect — select a campaign in the panel first" };
+    }
     return this._request(
       "/api/integrations/foundry/connect",
-      { method: "POST", body: JSON.stringify(input) },
+      { method: "POST", body: JSON.stringify({ ...input, campaignId }) },
       30000,
     );
+  }
+
+  /**
+   * Check connection health: token validity, linked campaign/world, and last sync time.
+   * `GET /api/integrations/foundry/health` → FoundryHealthResponse.
+   * @returns {Promise<ApiResult>}
+   */
+  async getHealth() {
+    return this._request("/api/integrations/foundry/health", { method: "GET" });
   }
 
   /**
