@@ -182,3 +182,73 @@
 .tc-name-dialog input {
   width: 100%;
 }
+
+/* ── Session Prep import ─────────────────────────────────────────────────── */
+.tablecodex-panel .tc-session-prep {
+  margin-top: 0.75rem;
+  border-top: 1px solid var(--color-border-light-tertiary, rgba(0,0,0,0.1));
+  padding-top: 0.5rem;
+}
+.tablecodex-panel .tc-session-prep > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.tablecodex-import {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.5rem;
+}
+.tablecodex-import .tc-import-plan {
+  margin: 0;
+  font-size: 1.05em;
+}
+.tablecodex-import .tc-import-options {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.tablecodex-import .tc-import-options li {
+  margin: 0.15rem 0;
+}
+.tablecodex-import .tc-import-stages {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.tablecodex-import .tc-stage {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.2rem 0;
+  opacity: 0.85;
+}
+.tablecodex-import .tc-stage i.fa-circle-check { color: #1e7a3c; }
+.tablecodex-import .tc-stage i.fa-spinner { color: #2e75b6; }
+
+.tablecodex-import .tc-progress-bar {
+  width: 100%;
+  height: 8px;
+  background: rgba(0, 0, 0, 0.12);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.tablecodex-import .tc-progress-fill {
+  height: 100%;
+  background: #2e75b6;
+  transition: width 0.2s ease;
+}
+.tablecodex-import .tc-conn-status {
+  margin: 0;
+  padding: 0.35rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.85em;
+}
+.tablecodex-import .tc-conn-status.tc-ok { background: rgba(40, 160, 80, 0.15); color: #1e7a3c; }
+.tablecodex-import .tc-conn-status.tc-err { background: rgba(192, 57, 43, 0.12); color: #c0392b; }
+.tablecodex-import .tc-import-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}

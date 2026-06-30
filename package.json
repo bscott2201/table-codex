@@ -6,6 +6,6 @@
   "description": "Foundry VTT V14 session telemetry capture & reconstruction module (no build step; package.json present only for tooling/Node test harness — Foundry loads scripts directly as ESM).",
   "scripts": {
     "check": "for f in $(find scripts -name '*.js'); do node --check \"$f\" || exit 1; done",
-    "test": "node tests/verify.mjs"
+    "test": "node tests/verify.mjs && node tests/import-verify.mjs"
   }
 }

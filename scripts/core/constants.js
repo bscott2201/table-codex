@@ -62,6 +62,13 @@ export const SETTINGS = Object.freeze({
  */
 export const FLAGS = Object.freeze({
   CORRELATION_ID: "correlationId",
+  // Session-prep import provenance (stored under the MODULE_ID scope). The export
+  // payload carries these values under its own `flags.tablecodex` namespace; the
+  // module persists them under its registered scope so re-imports can find docs.
+  PLAN_ID: "planId",
+  SCENE_ID: "sceneId",
+  FOLDER_KEY: "folderKey",
+  IMPORTED_AT: "importedAt",
 });
 
 /**

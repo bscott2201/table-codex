@@ -1,0 +1,57 @@
+{{!-- TableCodex Sync — session-prep import dialog --}}
+<section class="tablecodex-import">
+
+  <p class="tc-import-plan"><i class="fa-solid fa-book-open"></i> <strong>{{planTitle}}</strong></p>
+
+  {{#if idle}}
+    <p class="tc-hint">This creates scene journals (with player-safe read-aloud and GM-only notes) in your world. Re-running updates existing documents instead of duplicating them.</p>
+    <ul class="tc-import-options">
+      <li><label><input type="checkbox" name="optJournals" checked disabled /> Journals</label></li>
+      <li><label><input type="checkbox" name="optActors" disabled /> Actors <span class="tc-hint">(coming soon)</span></label></li>
+      <li><label><input type="checkbox" name="optScenes" disabled /> Scenes <span class="tc-hint">(coming soon)</span></label></li>
+    </ul>
+  {{/if}}
+
+  {{#unless idle}}
+    <ol class="tc-import-stages">
+      {{#each stages as |s|}}
+        <li class="tc-stage">
+          {{#if s.isDone}}<i class="fa-solid fa-circle-check"></i>
+          {{else if s.isActive}}<i class="fa-solid fa-spinner fa-spin"></i>
+          {{else}}<i class="fa-regular fa-circle"></i>{{/if}}
+          <span>{{s.label}}{{#if s.pending}} <em class="tc-hint">(later phase)</em>{{/if}}</span>
+        </li>
+      {{/each}}
+    </ol>
+
+    <div class="tc-progress-bar"><div class="tc-progress-fill" style="width: {{pct}}%"></div></div>
+  {{/unless}}
+
+  {{#if done}}
+    <p class="tc-conn-status tc-ok">
+      <i class="fa-solid fa-circle-check"></i>
+      Imported {{result.created}} new and {{result.updated}} updated journal(s).
+    </p>
+  {{/if}}
+
+  {{#if errored}}
+    <p class="tc-conn-status tc-err">
+      <i class="fa-solid fa-circle-exclamation"></i> {{error}}
+    </p>
+  {{/if}}
+
+  <div class="tc-actions tc-import-actions">
+    {{#if idle}}
+      <button type="button" data-action="startImport"><i class="fa-solid fa-file-import"></i> Start import</button>
+    {{/if}}
+    {{#if done}}
+      <button type="button" data-action="openJournals"><i class="fa-solid fa-book"></i> Open journals</button>
+    {{/if}}
+    {{#if errored}}
+      <button type="button" data-action="startImport"><i class="fa-solid fa-rotate-right"></i> Retry</button>
+    {{/if}}
+    {{#unless running}}
+      <button type="button" data-action="closeDialog"><i class="fa-solid fa-xmark"></i> Close</button>
+    {{/unless}}
+  </div>
+</section>

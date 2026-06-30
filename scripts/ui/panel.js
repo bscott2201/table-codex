@@ -20,6 +20,8 @@ import { jsonExporter } from "../export/json-exporter.js";
 import { markdownExporter } from "../export/markdown-exporter.js";
 import { uploadQueue } from "../export/upload-queue.js";
 import { apiClient } from "../export/api-client.js";
+import { listSessionPlans } from "../import/plan-fetcher.js";
+import { openImportDialog } from "../import/import-dialog.js";
 
 /** @type {any} cached singleton instance */
 let _instance = null;
@@ -46,6 +48,12 @@ function getPanelClass() {
     _campaigns = [];
     /** @type {{ok:boolean,message:string}|null} last test/load/save result */
     _status = null;
+    /** @type {import("../import/plan-fetcher.js").SessionPlanSummary[]} session plans (empty until loaded) */
+    _plans = [];
+    /** @type {boolean} whether a plan load has been attempted (drives "none found" copy) */
+    _plansLoaded = false;
+    /** @type {{ok:boolean,message:string}|null} last session-prep load/import result */
+    _prepStatus = null;
 
     static DEFAULT_OPTIONS = {
       id: "tablecodex-panel",
@@ -65,6 +73,8 @@ function getPanelClass() {
         testConnection: TableCodexPanel._onTest,
         loadCampaigns: TableCodexPanel._onLoadCampaigns,
         saveLink: TableCodexPanel._onSaveLink,
+        loadPlans: TableCodexPanel._onLoadPlans,
+        importPlan: TableCodexPanel._onImportPlan,
       },
     };
 
@@ -102,6 +112,11 @@ function getPanelClass() {
         })),
         hasCampaigns: this._campaigns.length > 0,
         status: this._status,
+        // Session Prep import section
+        plansLoaded: this._plansLoaded,
+        plans: this._plans,
+        hasPlans: this._plans.length > 0,
+        prepStatus: this._prepStatus,
       };
     }
 
@@ -274,6 +289,44 @@ function getPanelClass() {
 
       logger.info(`panel: campaign link saved (${campaignId || "none"})`);
       this.render();
+    }
+
+    // ── Session Prep import (PRD F5.1) ────────────────────────────────────────
+
+    /** @this {any} Load the importable session plans for the linked campaign. */
+    static async _onLoadPlans() {
+      const result = await listSessionPlans();
+      if (result.ok) {
+        this._plans = result.data ?? [];
+        this._plansLoaded = true;
+        this._prepStatus = { ok: true, message: `Loaded ${this._plans.length} plan(s).` };
+        if (this._plans.length === 0) {
+          ui.notifications?.warn("TableCodex: no session plans found for this campaign.");
+        }
+      } else {
+        this._plans = [];
+        this._plansLoaded = true;
+        this._prepStatus = { ok: false, message: result.error ?? "Failed to load plans." };
+        ui.notifications?.error(`TableCodex: ${this._prepStatus.message}`);
+      }
+      this.render();
+    }
+
+    /**
+     * @this {any}
+     * Open the import dialog for the selected plan. The dialog fetches the export
+     * payload and creates the Foundry documents (Phase 3: journals).
+     */
+    static _onImportPlan() {
+      const root = this.element;
+      const select = root?.querySelector('[name="sessionPlanId"]');
+      const planId = (select?.value ?? "").trim();
+      if (!planId) {
+        ui.notifications?.warn("TableCodex: select a plan to import.");
+        return;
+      }
+      const planTitle = this._plans.find((p) => String(p.id) === planId)?.title || `Plan ${planId}`;
+      openImportDialog({ planId, planTitle });
     }
   }
 

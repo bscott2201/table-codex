@@ -229,6 +229,50 @@ class ApiClient {
   }
 
   /**
+   * List importable session plans for the linked campaign (PRD F1.1).
+   * `GET /api/integrations/foundry/session-plans` → { success, plans: [...] }.
+   * Read-only summary; does NOT mark a plan as exported. Normalized to
+   * `data: [{ id, title, plannedSessionNumber, status, sceneCount, npcCount, hasBattleMaps, foundryExportedAt }]`.
+   * @returns {Promise<ApiResult>}
+   */
+  async listSessionPlans() {
+    if (!this.baseUrl) return { ok: false, error: "API URL not configured" };
+    const result = await this._request("/api/integrations/foundry/session-plans", { method: "GET" });
+    if (result.ok) {
+      const raw = result.data?.plans ?? (Array.isArray(result.data) ? result.data : []);
+      result.data = raw.map((p) => ({
+        id: p.id,
+        title: p.title ?? `Plan ${p.id}`,
+        plannedSessionNumber: p.plannedSessionNumber ?? null,
+        status: p.status ?? null,
+        sceneCount: p.sceneCount ?? 0,
+        npcCount: p.npcCount ?? 0,
+        hasBattleMaps: !!p.hasBattleMaps,
+        foundryExportedAt: p.foundryExportedAt ?? null,
+      }));
+    }
+    logger.debug("api-client: listSessionPlans", result.ok, result.data?.length ?? 0);
+    return result;
+  }
+
+  /**
+   * Fetch the full Foundry export payload for one plan (PRD F1.2). Fetching marks
+   * the plan as "exported" server-side — call this only when actually importing,
+   * not for the panel preview (use listSessionPlans for that).
+   * `GET /api/integrations/foundry/session-plans/:planId` → FoundryExportPayload.
+   * @param {number|string} planId
+   * @returns {Promise<ApiResult>}
+   */
+  async getSessionPlan(planId) {
+    if (planId == null) return { ok: false, error: "planId required" };
+    return this._request(
+      `/api/integrations/foundry/session-plans/${encodeURIComponent(planId)}`,
+      { method: "GET" },
+      30000,
+    );
+  }
+
+  /**
    * Get import processing status.
    * `GET /api/integrations/foundry/sync-status?importId=N`.
    * @param {number|string} importId

@@ -100,4 +100,40 @@
   </div>
   {{#unless apiUrl}}<p class="tc-hint">Set an API URL in “Connection &amp; Campaign” above to enable sync.</p>{{/unless}}
 
+  {{!-- ── Session Prep import (Campaign Scribe → Foundry) ── --}}
+  <details class="tc-session-prep">
+    <summary><i class="fa-solid fa-book-open"></i> Session Prep Import</summary>
+
+    <p class="tc-hint">Import a TableCodex session plan into this world as scene journals, NPC &amp; enemy actors, and battle-map scenes.</p>
+
+    <div class="tc-actions">
+      <button type="button" data-action="loadPlans" {{#unless linked}}disabled title="Link a campaign first"{{/unless}}>
+        <i class="fa-solid fa-rotate"></i> Load plans
+      </button>
+    </div>
+
+    {{#if hasPlans}}
+      <div class="form-group">
+        <label for="tc-sessionPlanId">Plan</label>
+        <select id="tc-sessionPlanId" name="sessionPlanId">
+          {{#each plans as |p|}}
+            <option value="{{p.id}}">{{#if p.plannedSessionNumber}}#{{p.plannedSessionNumber}} — {{/if}}{{p.title}} ({{p.sceneCount}} scenes, {{p.npcCount}} NPCs{{#if p.hasBattleMaps}}, maps{{/if}})</option>
+          {{/each}}
+        </select>
+      </div>
+      <div class="tc-actions">
+        <button type="button" data-action="importPlan"><i class="fa-solid fa-file-import"></i> Import to Foundry</button>
+      </div>
+    {{else if plansLoaded}}
+      <p class="tc-hint">No session plans found for this campaign yet — create one in TableCodex first.</p>
+    {{/if}}
+
+    {{#if prepStatus}}
+      <p class="tc-conn-status {{#if prepStatus.ok}}tc-ok{{else}}tc-err{{/if}}">
+        <i class="fa-solid {{#if prepStatus.ok}}fa-circle-check{{else}}fa-circle-exclamation{{/if}}"></i>
+        {{prepStatus.message}}
+      </p>
+    {{/if}}
+  </details>
+
 </section>
