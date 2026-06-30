@@ -36,15 +36,16 @@ export async function linkActorReferences(payload, idByName, planId) {
   }
   if (!bySceneId.size) return { linked: 0 };
 
-  let linked = 0;
-  for (const journal of game.journal ?? []) {
-    const flags = journal.flags?.[MODULE_ID];
-    if (!flags || flags[FLAGS.PLAN_ID] !== planId) continue;
-    const refs = bySceneId.get(flags[FLAGS.SCENE_ID]);
-    if (!refs?.length) continue;
+  // One session journal per plan; the per-scene GM Notes pages carry a sceneId flag.
+  const journal = game.journal?.find((j) => j.flags?.[MODULE_ID]?.[FLAGS.PLAN_ID] === planId);
+  if (!journal) return { linked: 0 };
 
-    const page = journal.pages?.find((p) => p.name === "GM Notes");
-    if (!page) continue;
+  let linked = 0;
+  for (const page of journal.pages ?? []) {
+    const pf = page.flags?.[MODULE_ID];
+    if (!pf || pf.kind !== "gm") continue;
+    const refs = bySceneId.get(pf[FLAGS.SCENE_ID]);
+    if (!refs?.length) continue;
 
     let html = page.text?.content ?? "";
     let changed = false;
@@ -73,7 +74,7 @@ export async function linkActorReferences(payload, idByName, planId) {
       try {
         await page.update({ text: { content: html } });
       } catch (err) {
-        logger.warn("reference-linker: failed to update page for", journal.name, err);
+        logger.warn("reference-linker: failed to update page for", page.name, err);
       }
     }
   }

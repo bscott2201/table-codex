@@ -136,14 +136,17 @@ const FOLDERS = [
   { key: "actors-root", name: "The Vault", type: "Actor" },
   { key: "actors-enemies", name: "Enemies", type: "Actor", parentKey: "actors-root" },
 ];
+const SCENE_KEY = "scene-the-gate-abc12345";
+// One session JournalEntry with session + per-scene pages.
 const JOURNALS = [
   {
-    name: "The Gate", folderKey: "journals-root", entryOwnershipDefault: 0,
+    name: "The Vault", folderKey: "journals-root", entryOwnershipDefault: 0,
     pages: [
-      { name: "Read Aloud", html: "<aside>x</aside>", ownershipDefault: 2 },
-      { name: "GM Notes", html: "<p>secret</p>", ownershipDefault: 0 },
+      { name: "Session Overview", html: "<p>premise</p>", ownershipDefault: 0, kind: "session" },
+      { name: "1. The Gate — Read-Aloud", html: "<aside>x</aside>", ownershipDefault: 2, kind: "read-aloud", sceneId: SCENE_KEY },
+      { name: "1. The Gate — GM Notes", html: "<p>secret</p>", ownershipDefault: 0, kind: "gm", sceneId: SCENE_KEY },
     ],
-    flags: { tablecodex: { planId: PLAN_ID, sceneId: "scene-the-gate-abc12345" } },
+    flags: { tablecodex: { planId: PLAN_ID } },
   },
 ];
 
@@ -160,22 +163,24 @@ const ids2 = await buildFolders(FOLDERS, PLAN_ID);
 ok(game.folders.length === before, "re-run creates no duplicate folders");
 ok(ids2.get("journals-root") === ids.get("journals-root"), "stable folder id across runs");
 
-console.log("\n[3] Journal ownership + creation");
+console.log("\n[3] Single journal entry + page ownership");
 const r1 = await buildJournals(JOURNALS, ids, PLAN_ID);
-ok(r1.created === 1 && r1.updated === 0, "one journal created");
-const gate = game.journal.find((j) => j.flags["tablecodex-sync"]?.sceneId === "scene-the-gate-abc12345");
-ok(gate?.ownership?.default === 0, "entry is GM-only (0)");
-const readAloud = gate.pages.find((p) => p.name === "Read Aloud");
-const gmNotes = gate.pages.find((p) => p.name === "GM Notes");
-ok(readAloud?.ownership?.default === 2, "Read Aloud page is OBSERVER (2)");
-ok(gmNotes?.ownership?.default === 0, "GM Notes page is NONE (0)");
+ok(r1.created === 1 && r1.updated === 0, "one journal entry created");
+const sessionJournal = game.journal.find((j) => j.flags["tablecodex-sync"]?.planId === PLAN_ID);
+ok(sessionJournal?.ownership?.default === 0, "entry is GM-only (0)");
+ok(sessionJournal.pages.length === 3, "all pages live in the single entry");
+const readAloud = sessionJournal.pages.find((p) => p.flags?.["tablecodex-sync"]?.kind === "read-aloud");
+const gmNotes = sessionJournal.pages.find((p) => p.flags?.["tablecodex-sync"]?.kind === "gm");
+ok(readAloud?.ownership?.default === 2, "read-aloud page is OBSERVER (2)");
+ok(gmNotes?.ownership?.default === 0, "GM page is NONE (0)");
+ok(gmNotes?.flags?.["tablecodex-sync"]?.sceneId === SCENE_KEY, "GM page carries sceneId flag");
 ok(readAloud?.text?.format === 1, "page stored as HTML format");
 
 console.log("\n[4] Journal idempotency (re-import)");
 const r2 = await buildJournals(JOURNALS, ids, PLAN_ID);
 ok(r2.created === 0 && r2.updated === 1, "re-import updates, does not create");
 ok(game.journal.length === 1, "no duplicate journal entry");
-ok(game.journal[0].pages.length === 2, "pages reconciled to two");
+ok(game.journal[0].pages.length === 3, "pages reconciled to three");
 
 console.log("\n[5] import-manager orchestration");
 const payload = { meta: { planId: PLAN_ID }, folders: FOLDERS, journals: JOURNALS };
@@ -257,41 +262,41 @@ const ar2 = await buildActors(ACTORS, ids, PLAN_ID);
 ok(game.actors.length === before9, "re-import creates no duplicate actors");
 ok(ar2.updated === 3 && ar2.created === 0, "re-import updates in place");
 
-console.log("\n[10] reference-linker @UUID into GM Notes");
+console.log("\n[10] reference-linker @UUID into the scene's GM page");
 const payload10 = { meta: { planId: PLAN_ID }, actors: ACTORS };
 const linkRes = await linkActorReferences(payload10, ar2.idByName, PLAN_ID);
 const gmPage = game.journal
-  .find((j) => j.flags["tablecodex-sync"]?.sceneId === "scene-the-gate-abc12345")
-  .pages.find((p) => p.name === "GM Notes");
+  .find((j) => j.flags["tablecodex-sync"]?.planId === PLAN_ID)
+  .pages.find((p) => p.flags?.["tablecodex-sync"]?.kind === "gm" && p.flags?.["tablecodex-sync"]?.sceneId === SCENE_KEY);
 ok(linkRes.linked >= 1, "linker reports links");
-ok(/@UUID\[Actor\./.test(gmPage.text.content), "GM Notes page contains an @UUID actor link");
+ok(/@UUID\[Actor\./.test(gmPage.text.content), "scene GM page contains an @UUID actor link");
 
 // ── Phase 6: scenes ──────────────────────────────────────────────────
 console.log("\n[11] scene-builder");
 await game.settings.set("tablecodex-sync", "apiUrl", "https://api.example.com");
 const sceneFolders = await buildFolders([{ key: "scenes-root", name: "The Vault", type: "Scene" }], PLAN_ID);
+// Only map-backed scenes reach the scene-builder now (gated server-side).
 const SCENES = [
-  { name: "The Gate", folderKey: "scenes-root", backgroundSrc: "/api/storage/objects/battle-maps/plan-42/gate.png", journalSceneKey: "scene-the-gate-abc12345", flags: { tablecodex: { planId: PLAN_ID, sceneId: "scene-the-gate-abc12345" } } },
-  { name: "Hall of Bones", folderKey: "scenes-root", backgroundSrc: null, journalSceneKey: "scene-hall-xyz", flags: { tablecodex: { planId: PLAN_ID, sceneId: "scene-hall-xyz" } } },
+  { name: "The Gate", folderKey: "scenes-root", backgroundSrc: "/api/storage/public-objects/battle-maps/plan-42/gate.png", journalSceneKey: SCENE_KEY, flags: { tablecodex: { planId: PLAN_ID, sceneId: SCENE_KEY } } },
 ];
 const sr = await buildScenes(SCENES, sceneFolders, PLAN_ID);
-ok(sr.created === 2, "two scenes created");
+ok(sr.created === 1, "one map-backed scene created");
 const gateScene = game.scenes.find((s) => s.name === "The Gate");
 ok(
-  gateScene.background?.src === "https://api.example.com/api/storage/objects/battle-maps/plan-42/gate.png",
-  "relative background resolved against API base",
+  gateScene.background?.src === "https://api.example.com/api/storage/public-objects/battle-maps/plan-42/gate.png",
+  "relative public background resolved against API base",
 );
-const gateJournalId = game.journal.find((j) => j.flags["tablecodex-sync"]?.sceneId === "scene-the-gate-abc12345").id;
-ok(gateScene.journal === gateJournalId, "scene linked to its narrative journal");
+const sessionJ = game.journal.find((j) => j.flags["tablecodex-sync"]?.planId === PLAN_ID);
+ok(gateScene.journal === sessionJ.id, "scene linked to the session journal");
+const raPageId = sessionJ.pages.find((p) => p.flags?.["tablecodex-sync"]?.kind === "read-aloud" && p.flags?.["tablecodex-sync"]?.sceneId === SCENE_KEY).id;
+ok(gateScene.journalEntryPage === raPageId, "scene linked to its read-aloud page");
 ok(gateScene.folder === sceneFolders.get("scenes-root"), "scene placed in scenes folder");
-const hallScene = game.scenes.find((s) => s.name === "Hall of Bones");
-ok(hallScene.background === undefined, "scene without a map has no background");
 
 console.log("\n[12] scene idempotency");
 const before12 = game.scenes.length;
 const sr2 = await buildScenes(SCENES, sceneFolders, PLAN_ID);
 ok(game.scenes.length === before12, "re-import creates no duplicate scenes");
-ok(sr2.updated === 2, "re-import updates scenes in place");
+ok(sr2.updated === 1, "re-import updates scenes in place");
 
 console.log(`\n${failed === 0 ? "PASS" : "FAIL"} — ${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);

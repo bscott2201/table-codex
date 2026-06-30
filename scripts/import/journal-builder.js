@@ -33,6 +33,14 @@ function toPageData(page) {
     title: { show: true, level: 1 },
     text: { content: page.html ?? "", format: htmlFormat() },
     ownership: { default: page.ownershipDefault },
+    // Page-level flags let the reference-linker target the right scene's GM page
+    // and the scene-builder link a Scene to its read-aloud page.
+    ...(page.sceneId || page.kind
+      ? { flags: { [MODULE_ID]: {
+          ...(page.sceneId ? { [FLAGS.SCENE_ID]: page.sceneId } : {}),
+          ...(page.kind ? { kind: page.kind } : {}),
+        } } }
+      : {}),
   };
 }
 
@@ -40,34 +48,28 @@ function entryFlags(entry) {
   return entry?.flags?.[MODULE_ID] ?? {};
 }
 
-/** Find an existing import-created entry for this plan + scene. */
-function findExistingJournal(planId, sceneId) {
-  return game.journal?.find(
-    (j) =>
-      entryFlags(j)[FLAGS.PLAN_ID] === planId &&
-      entryFlags(j)[FLAGS.SCENE_ID] === sceneId,
-  );
+/** Find the single import-created session journal for this plan. */
+function findExistingJournal(planId) {
+  return game.journal?.find((j) => entryFlags(j)[FLAGS.PLAN_ID] === planId);
 }
 
 /**
- * Create or update one scene/section journal.
+ * Create or update the session's JournalEntry (one entry, many pages).
  * @param {FoundryJournalDef} def
  * @param {number} planId
  * @param {string|null} folderId
  * @returns {Promise<{ id:string, created:boolean }>}
  */
 export async function upsertJournal(def, planId, folderId) {
-  const sceneId = def.flags?.tablecodex?.sceneId;
   const pages = (def.pages ?? []).map(toPageData);
   const flags = {
     [MODULE_ID]: {
       [FLAGS.PLAN_ID]: planId,
-      [FLAGS.SCENE_ID]: sceneId,
       [FLAGS.IMPORTED_AT]: Date.now(),
     },
   };
 
-  const existing = findExistingJournal(planId, sceneId);
+  const existing = findExistingJournal(planId);
   if (existing) {
     await existing.update({
       name: def.name,

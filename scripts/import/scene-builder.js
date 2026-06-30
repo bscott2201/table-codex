@@ -30,25 +30,31 @@ function sceneFlags(scene) {
   return scene?.flags?.[MODULE_ID] ?? {};
 }
 
-/** Find the JournalEntry created for this scene (same planId + sceneId). */
-function findSceneJournal(planId, journalSceneKey) {
-  return game.journal?.find(
-    (j) =>
-      j.flags?.[MODULE_ID]?.[FLAGS.PLAN_ID] === planId &&
-      j.flags?.[MODULE_ID]?.[FLAGS.SCENE_ID] === journalSceneKey,
+/** The single session JournalEntry for this plan. */
+function findSessionJournal(planId) {
+  return game.journal?.find((j) => j.flags?.[MODULE_ID]?.[FLAGS.PLAN_ID] === planId);
+}
+
+/** The read-aloud page within the session journal for a given scene. */
+function findReadAloudPage(journal, sceneKey) {
+  return journal?.pages?.find(
+    (p) => p.flags?.[MODULE_ID]?.[FLAGS.SCENE_ID] === sceneKey && p.flags?.[MODULE_ID]?.kind === "read-aloud",
   );
 }
 
 /** Build Scene.create data for one scene def. */
 function toSceneData(def, planId, folderId) {
   const src = resolveSrc(def.backgroundSrc);
-  const journal = findSceneJournal(planId, def.journalSceneKey);
+  const journal = findSessionJournal(planId);
+  const page = findReadAloudPage(journal, def.journalSceneKey);
   return {
     name: def.name,
     folder: folderId ?? null,
     ...(src ? { background: { src }, width: 1536, height: 1024 } : {}),
     grid: { size: DEFAULT_GRID },
+    // Link the scene to the session journal, and to this scene's read-aloud page.
     ...(journal ? { journal: journal.id } : {}),
+    ...(page ? { journalEntryPage: page.id } : {}),
     flags: {
       [MODULE_ID]: {
         [FLAGS.PLAN_ID]: planId,
