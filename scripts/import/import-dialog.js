@@ -25,7 +25,7 @@ function getDialogClass() {
     /** @type {number|string|null} */ _planId = null;
     /** @type {string} */ _planTitle = "";
     /** @type {"idle"|"running"|"done"|"error"} */ _phase = "idle";
-    /** @type {{journals:boolean}} */ _options = { journals: true };
+    /** @type {{journals:boolean, actors:boolean}} */ _options = { journals: true, actors: true };
     /** @type {Record<string,"pending"|"active"|"done">} */ _stageState = {};
     /** @type {{done:number,total:number}|null} */ _progress = null;
     /** @type {string|null} */ _error = null;
@@ -72,7 +72,14 @@ function getDialogClass() {
         done: this._phase === "done",
         errored: this._phase === "error",
         error: this._error,
-        result: this._result,
+        result: this._result
+          ? {
+              journalsNew: this._result.journals?.created ?? 0,
+              journalsUpd: this._result.journals?.updated ?? 0,
+              actorsNew: this._result.actors?.created ?? 0,
+              actorsUpd: this._result.actors?.updated ?? 0,
+            }
+          : null,
         stages,
         pct,
       };
@@ -118,10 +125,11 @@ function getDialogClass() {
           if (this._stageState[key] === "active") this._stageState[key] = "done";
         }
         this._phase = "done";
-        this._result = result.journals;
-        const n = result.journals.created + result.journals.updated;
+        this._result = { journals: result.journals, actors: result.actors };
+        const j = result.journals.created + result.journals.updated;
+        const a = (result.actors?.created ?? 0) + (result.actors?.updated ?? 0);
         ui.notifications?.info(
-          `TableCodex: imported ${n} journal(s) for “${this._planTitle}” (${result.journals.created} new, ${result.journals.updated} updated).`,
+          `TableCodex: imported “${this._planTitle}” — ${j} journal(s), ${a} actor(s).`,
         );
         this.render();
       } catch (err) {

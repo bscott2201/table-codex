@@ -18,12 +18,14 @@
 import { logger } from "../core/logger.js";
 import { buildFolders } from "./folder-manager.js";
 import { buildJournals } from "./journal-builder.js";
+import { buildActors } from "./actor-builder.js";
+import { linkActorReferences } from "./reference-linker.js";
 
 /** Ordered stages. `run` flags which are active this phase. */
 export const IMPORT_STAGES = [
   { key: "folders", label: "Creating folders" },
   { key: "journals", label: "Creating journals" },
-  { key: "actors", label: "Creating actors", pending: true }, // Phase 4
+  { key: "actors", label: "Creating actors" },
   { key: "scenes", label: "Creating scenes", pending: true }, // Phase 6
   { key: "finalize", label: "Finalizing" },
 ];
@@ -51,7 +53,7 @@ export class ImportManager extends EventTarget {
    * @param {{ journals?:boolean, actors?:boolean, scenes?:boolean }} [options]
    */
   async run(options = {}) {
-    const opts = { journals: true, actors: false, scenes: false, ...options };
+    const opts = { journals: true, actors: true, scenes: false, ...options };
     try {
       if (!this.planId) throw new Error("export payload has no plan id");
 
@@ -59,7 +61,7 @@ export class ImportManager extends EventTarget {
       this._stage("folders", 0);
       const folderIds = await buildFolders(this.payload.folders ?? [], this.planId);
 
-      // 2. Journals
+      // 2. Journals (created before actors; actor @UUID links are filled in below)
       let journalResult = { created: 0, updated: 0, ids: [] };
       if (opts.journals) {
         this._stage("journals", 1);
@@ -71,14 +73,29 @@ export class ImportManager extends EventTarget {
         );
       }
 
-      // 3/4. Actors (Phase 4) and Scenes (Phase 6) — not yet implemented.
-      if (opts.actors) logger.info("import-manager: actor import not available until Phase 4");
+      // 3. Actors, then the @UUID second pass into the GM Notes journals.
+      let actorResult = { created: 0, updated: 0, idByName: new Map() };
+      if (opts.actors) {
+        this._stage("actors", 2);
+        actorResult = await buildActors(
+          this.payload.actors ?? [],
+          folderIds,
+          this.planId,
+          (done, total) => this._emit("progress", { stage: "actors", done, total }),
+        );
+        if (actorResult.idByName.size) {
+          await linkActorReferences(this.payload, actorResult.idByName, this.planId);
+        }
+      }
+
+      // 4. Scenes (Phase 6) — not yet implemented.
       if (opts.scenes) logger.info("import-manager: scene import not available until Phase 6");
 
       this._stage("finalize", 4);
       const result = {
         folderId: folderIds.get("journals-root") ?? null,
         journals: { created: journalResult.created, updated: journalResult.updated },
+        actors: { created: actorResult.created, updated: actorResult.updated },
       };
       this._emit("done", result);
       logger.info("import-manager: import complete", result);

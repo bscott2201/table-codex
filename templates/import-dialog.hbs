@@ -7,7 +7,7 @@
     <p class="tc-hint">This creates scene journals (with player-safe read-aloud and GM-only notes) in your world. Re-running updates existing documents instead of duplicating them.</p>
     <ul class="tc-import-options">
       <li><label><input type="checkbox" name="optJournals" checked disabled /> Journals</label></li>
-      <li><label><input type="checkbox" name="optActors" disabled /> Actors <span class="tc-hint">(coming soon)</span></label></li>
+      <li><label><input type="checkbox" name="optActors" checked disabled /> Actors</label></li>
       <li><label><input type="checkbox" name="optScenes" disabled /> Scenes <span class="tc-hint">(coming soon)</span></label></li>
     </ul>
   {{/if}}
@@ -30,7 +30,8 @@
   {{#if done}}
     <p class="tc-conn-status tc-ok">
       <i class="fa-solid fa-circle-check"></i>
-      Imported {{result.created}} new and {{result.updated}} updated journal(s).
+      Journals: {{result.journalsNew}} new, {{result.journalsUpd}} updated.
+      Actors: {{result.actorsNew}} new, {{result.actorsUpd}} updated.
     </p>
   {{/if}}
 

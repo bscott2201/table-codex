@@ -37,7 +37,9 @@ globalThis.game = {
   },
   folders: [],
   journal: [],
+  actors: [],
 };
+globalThis.CONFIG = { DND5E: { activityTypes: { attack: {}, save: {} } } };
 globalThis.ui = { notifications: { warn() {}, info() {}, error() {} }, sidebar: { activateTab() {} } };
 
 // ── Fake document classes ────────────────────────────────────────────
@@ -51,6 +53,13 @@ globalThis.Folder = {
 
 class FakePage {
   constructor(data) { Object.assign(this, data); this.id = nextId(); }
+  async update(data) {
+    for (const [k, v] of Object.entries(data)) {
+      if (k === "text" && this.text) this.text = { ...this.text, ...v };
+      else this[k] = v;
+    }
+    return this;
+  }
 }
 class FakeJournal {
   constructor(data) {
@@ -75,6 +84,30 @@ class FakeJournal {
 }
 globalThis.JournalEntry = {
   async create(data) { const j = new FakeJournal(data); game.journal.push(j); return j; },
+};
+
+class FakeItem {
+  constructor(data) { Object.assign(this, data); this.id = nextId(); }
+}
+class FakeActor {
+  constructor(data) {
+    Object.assign(this, data);
+    this.id = data.id ?? nextId();
+    this.items = (data.items ?? []).map((it) => new FakeItem(it));
+  }
+  async update(data) { const { items, ...rest } = data; Object.assign(this, rest); return this; }
+  async createEmbeddedDocuments(type, docs) {
+    const created = docs.map((d) => new FakeItem(d));
+    this.items.push(...created);
+    return created;
+  }
+  async deleteEmbeddedDocuments(type, ids) {
+    this.items = this.items.filter((it) => !ids.includes(it.id));
+    return ids;
+  }
+}
+globalThis.Actor = {
+  async create(data) { const a = new FakeActor(data); game.actors.push(a); return a; },
 };
 
 // ── assert harness ───────────────────────────────────────────────────
@@ -143,6 +176,85 @@ mgr.addEventListener("stage", (e) => seenStages.push(e.detail.stage));
 const result = await mgr.run({ journals: true });
 ok(seenStages.includes("folders") && seenStages.includes("journals"), "emits folder + journal stages");
 ok(result.journals.updated === 1, "manager reports journal updated on third pass");
+
+// ── Phase 4: statblock mapper + actors ───────────────────────────────
+const { detectSystem } = await import("../scripts/integrations/dnd5e.js");
+detectSystem(); // version 5.0.0 → hasActivities() true
+const { mapToFoundrySystem } = await import("../scripts/import/statblock-mapper.js");
+const { buildActors } = await import("../scripts/import/actor-builder.js");
+const { linkActorReferences } = await import("../scripts/import/reference-linker.js");
+
+const SKELETON_SB = {
+  source: "srd", ac: 13, hp: 13, hpFormula: "2d8+4", speed: 30,
+  abilities: { str: 10, dex: 14, con: 15, int: 6, wis: 8, cha: 5 },
+  cr: 0.25, size: "med", type: "undead", subtype: "skeleton",
+  saves: { dex: 4 }, skills: { perception: 2, stealth: 4 },
+  damageImmunities: ["poison"], conditionImmunities: ["poisoned"],
+  senses: "darkvision 60 ft.", languages: "understands all it knew in life",
+  traits: [{ name: "Undead Nature", desc: "Doesn't require air." }],
+  actions: [
+    { name: "Shortsword", desc: "Melee Weapon Attack: reach 5 ft.", attackBonus: 4, damageDice: "1d6+2", damageType: "piercing" },
+    { name: "Withering Gaze", desc: "DC 13 Wisdom saving throw.", saveAbility: "wis", saveDC: 13, damageDice: "2d6", damageType: "necrotic" },
+  ],
+  legendaryActions: [{ name: "Move", desc: "Moves up to its speed." }],
+};
+
+console.log("\n[6] statblock-mapper core stats");
+const mapped = mapToFoundrySystem(SKELETON_SB, "<p>bio</p>");
+ok(mapped.system.attributes.ac.flat === 13 && mapped.system.attributes.ac.calc === "flat", "AC flat=13");
+ok(mapped.system.attributes.hp.value === 13 && mapped.system.attributes.hp.max === 13, "HP value+max set");
+ok(mapped.system.attributes.movement.walk === 30, "walk speed mapped");
+ok(mapped.system.abilities.dex.value === 14 && mapped.system.abilities.dex.proficient === 1, "DEX value + save proficiency");
+ok(mapped.system.details.type.value === "undead" && mapped.system.details.type.subtype === "skeleton", "creature type + subtype");
+ok(mapped.system.traits.size === "med" && mapped.system.traits.di.value.includes("poison"), "size + damage immunity");
+ok(mapped.system.attributes.senses.darkvision === 60, "darkvision parsed to 60");
+ok(mapped.system.skills.prc?.value === 1 && mapped.system.skills.ste?.value === 1, "skills mapped to dnd5e keys");
+ok(mapped.system.resources?.legact?.max === 1, "legendary action resource set");
+
+console.log("\n[7] statblock-mapper items + activities");
+const sword = mapped.items.find((it) => it.name === "Shortsword");
+ok(sword?.type === "weapon", "attack action → weapon item");
+const atk = Object.values(sword.system.activities)[0];
+ok(atk?.type === "attack" && atk.attack.flat === true && atk.attack.bonus === "4", "attack activity flat to-hit +4");
+ok(atk.damage.parts[0].number === 1 && atk.damage.parts[0].denomination === 6 && atk.damage.parts[0].bonus === "2", "damage 1d6+2 parsed");
+ok(atk.damage.parts[0].types[0] === "piercing", "damage type piercing");
+const gaze = mapped.items.find((it) => it.name === "Withering Gaze");
+const save = Object.values(gaze.system.activities)[0];
+ok(save?.type === "save" && save.save.ability[0] === "wis" && save.save.dc.formula === "13", "save activity DC 13 wis");
+const legend = mapped.items.find((it) => it.name === "Move");
+ok(legend?.system.activation?.type === "legendary", "legendary action item activation");
+ok(mapped.items.find((it) => it.name === "Undead Nature")?.type === "feat", "trait → passive feat");
+
+console.log("\n[8] actor-builder NPC + enemy");
+const ACTORS = [
+  { name: "Gravekeeper Mol", type: "npc", folderKey: "actors-npcs", statblock: null, biography: "<p>guards</p>", flags: { tablecodex: { planId: PLAN_ID } } },
+  { name: "Skeleton", type: "npc", folderKey: "actors-enemies", statblock: SKELETON_SB, biography: "", flags: { tablecodex: { planId: PLAN_ID, sceneId: "scene-the-gate-abc12345" } } },
+  { name: "Wraith", type: "npc", folderKey: "actors-enemies", statblock: null, fallback: { ac: 13, hp: 67 }, biography: "", flags: { tablecodex: { planId: PLAN_ID, sceneId: "scene-the-gate-abc12345" } } },
+];
+const ar = await buildActors(ACTORS, ids, PLAN_ID);
+ok(ar.created === 3, "three actors created");
+const mol = game.actors.find((a) => a.name === "Gravekeeper Mol");
+ok(mol.items.length === 0 && /guards/.test(mol.system.details.biography.value), "NPC actor: biography, no items");
+const skel = game.actors.find((a) => a.name === "Skeleton");
+ok(skel.system.attributes.ac.flat === 13 && skel.items.length > 0, "enemy actor: full system + items");
+const wraith = game.actors.find((a) => a.name === "Wraith");
+ok(wraith.system.attributes.ac.flat === 13 && wraith.system.attributes.hp.max === 67, "fallback ac/hp actor");
+ok(ar.idByName.get("skeleton") === skel.id, "idByName maps name → actor id");
+
+console.log("\n[9] actor idempotency");
+const before9 = game.actors.length;
+const ar2 = await buildActors(ACTORS, ids, PLAN_ID);
+ok(game.actors.length === before9, "re-import creates no duplicate actors");
+ok(ar2.updated === 3 && ar2.created === 0, "re-import updates in place");
+
+console.log("\n[10] reference-linker @UUID into GM Notes");
+const payload10 = { meta: { planId: PLAN_ID }, actors: ACTORS };
+const linkRes = await linkActorReferences(payload10, ar2.idByName, PLAN_ID);
+const gmPage = game.journal
+  .find((j) => j.flags["tablecodex-sync"]?.sceneId === "scene-the-gate-abc12345")
+  .pages.find((p) => p.name === "GM Notes");
+ok(linkRes.linked >= 1, "linker reports links");
+ok(/@UUID\[Actor\./.test(gmPage.text.content), "GM Notes page contains an @UUID actor link");
 
 console.log(`\n${failed === 0 ? "PASS" : "FAIL"} — ${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);
