@@ -38,6 +38,7 @@ globalThis.game = {
   folders: [],
   journal: [],
   actors: [],
+  scenes: [],
 };
 globalThis.CONFIG = { DND5E: { activityTypes: { attack: {}, save: {} } } };
 globalThis.ui = { notifications: { warn() {}, info() {}, error() {} }, sidebar: { activateTab() {} } };
@@ -108,6 +109,14 @@ class FakeActor {
 }
 globalThis.Actor = {
   async create(data) { const a = new FakeActor(data); game.actors.push(a); return a; },
+};
+
+class FakeScene {
+  constructor(data) { Object.assign(this, data); this.id = data.id ?? nextId(); }
+  async update(data) { Object.assign(this, data); return this; }
+}
+globalThis.Scene = {
+  async create(data) { const s = new FakeScene(data); game.scenes.push(s); return s; },
 };
 
 // ── assert harness ───────────────────────────────────────────────────
@@ -183,6 +192,7 @@ detectSystem(); // version 5.0.0 → hasActivities() true
 const { mapToFoundrySystem } = await import("../scripts/import/statblock-mapper.js");
 const { buildActors } = await import("../scripts/import/actor-builder.js");
 const { linkActorReferences } = await import("../scripts/import/reference-linker.js");
+const { buildScenes } = await import("../scripts/import/scene-builder.js");
 
 const SKELETON_SB = {
   source: "srd", ac: 13, hp: 13, hpFormula: "2d8+4", speed: 30,
@@ -255,6 +265,33 @@ const gmPage = game.journal
   .pages.find((p) => p.name === "GM Notes");
 ok(linkRes.linked >= 1, "linker reports links");
 ok(/@UUID\[Actor\./.test(gmPage.text.content), "GM Notes page contains an @UUID actor link");
+
+// ── Phase 6: scenes ──────────────────────────────────────────────────
+console.log("\n[11] scene-builder");
+await game.settings.set("tablecodex-sync", "apiUrl", "https://api.example.com");
+const sceneFolders = await buildFolders([{ key: "scenes-root", name: "The Vault", type: "Scene" }], PLAN_ID);
+const SCENES = [
+  { name: "The Gate", folderKey: "scenes-root", backgroundSrc: "/api/storage/objects/battle-maps/plan-42/gate.png", journalSceneKey: "scene-the-gate-abc12345", flags: { tablecodex: { planId: PLAN_ID, sceneId: "scene-the-gate-abc12345" } } },
+  { name: "Hall of Bones", folderKey: "scenes-root", backgroundSrc: null, journalSceneKey: "scene-hall-xyz", flags: { tablecodex: { planId: PLAN_ID, sceneId: "scene-hall-xyz" } } },
+];
+const sr = await buildScenes(SCENES, sceneFolders, PLAN_ID);
+ok(sr.created === 2, "two scenes created");
+const gateScene = game.scenes.find((s) => s.name === "The Gate");
+ok(
+  gateScene.background?.src === "https://api.example.com/api/storage/objects/battle-maps/plan-42/gate.png",
+  "relative background resolved against API base",
+);
+const gateJournalId = game.journal.find((j) => j.flags["tablecodex-sync"]?.sceneId === "scene-the-gate-abc12345").id;
+ok(gateScene.journal === gateJournalId, "scene linked to its narrative journal");
+ok(gateScene.folder === sceneFolders.get("scenes-root"), "scene placed in scenes folder");
+const hallScene = game.scenes.find((s) => s.name === "Hall of Bones");
+ok(hallScene.background === undefined, "scene without a map has no background");
+
+console.log("\n[12] scene idempotency");
+const before12 = game.scenes.length;
+const sr2 = await buildScenes(SCENES, sceneFolders, PLAN_ID);
+ok(game.scenes.length === before12, "re-import creates no duplicate scenes");
+ok(sr2.updated === 2, "re-import updates scenes in place");
 
 console.log(`\n${failed === 0 ? "PASS" : "FAIL"} — ${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);

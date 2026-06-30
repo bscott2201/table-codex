@@ -12,5 +12,6 @@ export { buildJournals, upsertJournal } from "./journal-builder.js";
 export { mapToFoundrySystem } from "./statblock-mapper.js";
 export { buildActors, pooledMap } from "./actor-builder.js";
 export { linkActorReferences } from "./reference-linker.js";
+export { buildScenes } from "./scene-builder.js";
 export { ImportManager, orchestrateImport, IMPORT_STAGES } from "./import-manager.js";
 export { openImportDialog } from "./import-dialog.js";
