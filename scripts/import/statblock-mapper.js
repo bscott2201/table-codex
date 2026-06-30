@@ -59,15 +59,19 @@ function damagePart(action) {
   };
 }
 
-/** Parse a senses string into the dnd5e senses object. */
+/**
+ * Parse a senses string into the dnd5e v5 senses object. In dnd5e 5.x the numeric
+ * ranges live under `senses.ranges.{darkvision,...}` (NOT flat on `senses`).
+ */
 function parseSenses(senses) {
-  const out = { darkvision: 0, blindsight: 0, tremorsense: 0, truesight: 0, units: "ft", special: "" };
-  if (typeof senses !== "string") return out;
-  for (const key of ["darkvision", "blindsight", "tremorsense", "truesight"]) {
-    const m = senses.match(new RegExp(`${key}\\s+(\\d+)`, "i"));
-    if (m) out[key] = parseInt(m[1], 10);
+  const ranges = { darkvision: null, blindsight: null, tremorsense: null, truesight: null };
+  if (typeof senses === "string") {
+    for (const key of Object.keys(ranges)) {
+      const m = senses.match(new RegExp(`${key}\\s+(\\d+)`, "i"));
+      if (m) ranges[key] = parseInt(m[1], 10);
+    }
   }
-  return out;
+  return { ranges, units: "ft", special: "" };
 }
 
 /** melee vs ranged inferred from the action description. */

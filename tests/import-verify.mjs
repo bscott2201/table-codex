@@ -217,7 +217,7 @@ ok(mapped.system.attributes.movement.walk === 30, "walk speed mapped");
 ok(mapped.system.abilities.dex.value === 14 && mapped.system.abilities.dex.proficient === 1, "DEX value + save proficiency");
 ok(mapped.system.details.type.value === "undead" && mapped.system.details.type.subtype === "skeleton", "creature type + subtype");
 ok(mapped.system.traits.size === "med" && mapped.system.traits.di.value.includes("poison"), "size + damage immunity");
-ok(mapped.system.attributes.senses.darkvision === 60, "darkvision parsed to 60");
+ok(mapped.system.attributes.senses.ranges.darkvision === 60, "darkvision parsed to senses.ranges (dnd5e v5)");
 ok(mapped.system.skills.prc?.value === 1 && mapped.system.skills.ste?.value === 1, "skills mapped to dnd5e keys");
 ok(mapped.system.resources?.legact?.max === 1, "legendary action resource set");
 
