@@ -66,6 +66,8 @@ const { sortEvents } = await import("../scripts/reconstruction/timeline.js");
 const { reconstructionEngine } = await import("../scripts/reconstruction/reconstruction-engine.js");
 const { EVENT_TYPES } = await import("../scripts/core/constants.js");
 const { jsonExporter } = await import("../scripts/export/json-exporter.js");
+const { sessionManager } = await import("../scripts/session/session-manager.js");
+const { buildPayload } = await import("../scripts/export/payload.js");
 
 console.log("\n[1] Envelope enforcement");
 {
@@ -212,6 +214,55 @@ console.log("\n[8] Midi save + per-target damage enrichment");
   ok(a.saved === false && b.saved === true, "per-target save outcome captured");
   ok(a.appliedDamage === 26 && b.appliedDamage === 13, "per-target APPLIED damage captured (26 vs 13)");
   ok(b.oldHP === 40 && b.newHP === 27, "per-target HP before/after captured");
+}
+
+console.log("\n[9] Session recency signal (sessionIndex / previousSessionId)");
+{
+  globalThis.TableCodexSync = { sessionManager };
+  settingsStore.delete("sessionIndex");
+  settingsStore.delete("rawEventBuffer");
+  resetSeq(0);
+
+  const first = await sessionManager.start({ title: "First session" });
+  ok(first.sessionIndex === 0, "first session in a world has sessionIndex 0");
+  ok(first.previousSessionId === null, "first session has no previousSessionId");
+
+  const payloadFirst = buildPayload();
+  ok(payloadFirst.session.sessionIndex === 0, "export payload carries sessionIndex 0 for the first session");
+  ok(payloadFirst.session.previousSessionId === null, "export payload carries a null previousSessionId for the first session");
+
+  await sessionManager.stop();
+
+  const second = await sessionManager.start({ title: "Second session" });
+  ok(second.sessionIndex === 1, "second session has sessionIndex 1 (one prior finished session)");
+  ok(second.previousSessionId === first.id, "second session's previousSessionId points at the first session's id");
+
+  const payloadSecond = buildPayload();
+  ok(payloadSecond.session.sessionIndex === 1, "export payload carries sessionIndex 1 for the second session");
+  ok(payloadSecond.session.previousSessionId === first.id, "export payload carries the predecessor's id");
+
+  await sessionManager.stop();
+}
+
+console.log("\n[10] Session recency signal survives resume()");
+{
+  settingsStore.delete("sessionIndex");
+  resetSeq(0);
+  const started = await sessionManager.start({ title: "Reload session" });
+
+  // Simulate a page reload: the in-memory manager is torn down, but the
+  // write-ahead buffer (with the SESSION_START event's metadata) persists.
+  sessionManager.meta = null;
+  const resumed = await sessionManager.resume();
+
+  ok(resumed === true, "resume() reports an active session was found");
+  ok(sessionManager.meta.sessionIndex === started.sessionIndex, "resumed session keeps its original sessionIndex");
+  ok(
+    sessionManager.meta.previousSessionId === started.previousSessionId,
+    "resumed session keeps its original previousSessionId",
+  );
+
+  await sessionManager.stop();
 }
 
 console.log(`\n${failed === 0 ? "PASS" : "FAIL"} — ${passed} passed, ${failed} failed\n`);

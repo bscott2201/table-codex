@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.3 — Explicit session recency signal
+
+- **`sessionIndex` and `previousSessionId` added to the session export contract.** `session-manager.start()` now reads the world's `SETTINGS.SESSION_INDEX` and stamps the new session with its 0-based ordinal position (`sessionIndex`) and the id of the last finished session (`previousSessionId`, `null` for the world's first session). Both fields flow through `SESSION_START` metadata into `SessionMeta`, survive `resume()` (rebuilt from the persisted `SESSION_START` event), and are carried in the export payload's `session` block. Downstream consumers can now determine session order deterministically instead of inferring it from timestamps or upload order.
+
 ## 0.7.4 — One control window + named sessions
 
 - **Single unified window.** Campaign linking is no longer a separate dialog — the API URL/token, Test connection, Load campaigns, and campaign pick/save now live in a collapsible "Connection & Campaign" section inside the main panel. The section auto-opens until a campaign is linked, then collapses. `openCampaignLink()` is kept as an alias that opens the unified panel, so existing macros/module-API callers keep working.

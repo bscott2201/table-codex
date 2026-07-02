@@ -30,6 +30,8 @@ import { eventStore } from "../bus/event-store.js";
  * @property {string} systemVersion
  * @property {string} foundryVersion
  * @property {string} moduleVersion
+ * @property {number} sessionIndex        0-based ordinal position among this world's finished sessions (SESSION_INDEX.length at start time).
+ * @property {string|null} previousSessionId  id of the most recently finished session in this world, or null for the first session.
  * @property {string} title            Human-friendly session name (becomes the TableCodex session title).
  * @property {string|null} campaignId
  * @property {{id:string,name:string}[]} users
@@ -70,6 +72,10 @@ class SessionManager {
     resetSeq(0);
 
     const g = globalThis.game;
+    // Recency signal: this session's ordinal position and predecessor among the
+    // world's finished sessions, so downstream consumers can order sessions
+    // deterministically instead of inferring order from timestamps/upload order.
+    const priorSessions = g?.settings?.get(MODULE_ID, SETTINGS.SESSION_INDEX) ?? [];
     this.meta = {
       id: `s_${Date.now().toString(36)}_${randomId(8)}`,
       active: true,
@@ -81,6 +87,8 @@ class SessionManager {
       systemVersion: g?.system?.version ?? "",
       foundryVersion: g?.version ?? "",
       moduleVersion: g?.modules?.get?.(MODULE_ID)?.version ?? MODULE_VERSION,
+      sessionIndex: priorSessions.length,
+      previousSessionId: priorSessions.at(-1)?.id ?? null,
       // Human-friendly session name. Falls back to "<World> — <date>" when the
       // start dialog was dismissed without a name. Flows into SESSION_START
       // metadata and the export payload (session.title) → TableCodex session title.
