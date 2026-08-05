@@ -7,7 +7,7 @@
  * OpenAPI spec (/api/me, /api/campaigns, /api/campaigns/:id/sessions[/transcript]).
  */
 
-import { MODULE_ID, MODULE_VERSION, SETTINGS } from "../core/constants.js";
+import { MODULE_ID, MODULE_VERSION, ENVELOPE_SCHEMA, SETTINGS } from "../core/constants.js";
 import { logger } from "../core/logger.js";
 import { getSetting } from "../core/settings.js";
 
@@ -169,16 +169,17 @@ class ApiClient {
   async syncSession(payload) {
     if (!this.baseUrl) return { ok: false, error: "API URL not configured" };
     const body = this._buildImportPayload(payload);
-    if (!body.foundryWorldId) return { ok: false, error: "missing foundry world id" };
+    const session = body.session ?? {};
+    if (!session.worldId) return { ok: false, error: "missing foundry world id" };
 
     // Best-effort: register/refresh the world connection first (idempotent).
     await this.connectWorld({
       campaignId: body.campaignId,
-      foundryWorldId: body.foundryWorldId,
-      foundryWorldName: body.foundryWorldName,
-      systemId: body.systemId,
-      foundryVersion: body.foundryVersion,
-      moduleVersion: body.moduleVersion,
+      foundryWorldId: session.worldId,
+      foundryWorldName: session.worldName,
+      systemId: session.systemId,
+      foundryVersion: session.foundryVersion,
+      moduleVersion: session.moduleVersion,
     }).catch(() => {});
 
     const result = await this._request(
@@ -193,38 +194,67 @@ class ApiClient {
   }
 
   /**
-   * Map our payload (buildPayload output) to FoundryImportPayload. Required:
-   * `foundryWorldId`. We send the full raw envelope log plus a few derived
-   * arrays the server understands.
+   * Map our payload (buildPayload output) to FoundryImportPayload.
+   *
+   * We send the capture ENVELOPE as-is (`session` + `reconstruction` +
+   * `rawEvents`) rather than flattening it into top-level scalars and derived
+   * arrays. The server sniffs the payload shape, and the envelope form routes to
+   * its "module capture format" branch, which is the only one that:
+   *   • reads `session.sessionIndex` / `session.previousSessionId` — the
+   *     deterministic recency ordinal the recap + intelligence pipelines order
+   *     sessions by. Flattening dropped `session` entirely, so every API-synced
+   *     session landed with a null ordinal.
+   *   • ignores a `rolls` array, so rolls are not imported twice — once from
+   *     `rolls` and again from the same events in `rawEvents`. The `rolls` copy
+   *     was also the unattributed one (the server reads `roll.actor`, but
+   *     roll-capture records the speaker as `metadata.speakerAlias`).
+   *   • resolves systemId/foundryVersion/moduleVersion from `session`; the
+   *     legacy branch does not surface them at all.
+   *
+   * That branch is gated on the payload NOT carrying `foundryWorldId`, `rolls`,
+   * or `chatMessages` at the top level — it tests key presence, so those keys
+   * must be absent entirely, not merely undefined. Do not reintroduce them here.
+   * `campaignId` and `title` stay at the root because the server reads both from
+   * the root and neither affects shape detection.
+   *
    * @param {object} payload
    */
   _buildImportPayload(payload) {
     const session = payload?.session ?? {};
     const recon = payload?.reconstruction ?? {};
-    const events = payload?.rawEvents ?? [];
     const campaignIdRaw = (getSetting(SETTINGS.CAMPAIGN_ID) || "").toString().trim();
     const campaignId = campaignIdRaw ? Number(campaignIdRaw) : undefined;
 
-    const rolls = events.filter((e) => e.eventType === "roll").map((e) => e.metadata);
-    const actors = Object.values(recon.actors ?? {});
+    // The world id is the dedup key server-side, so resolve it to something
+    // non-empty here rather than shipping "" and creating an orphan import.
+    const worldId = session.worldId || getSetting(SETTINGS.WORLD_ID) || game?.world?.id || "";
+    const worldName =
+      session.worldName || getSetting(SETTINGS.WORLD_NAME) || game?.world?.title || worldId;
 
     return {
       ...(Number.isFinite(campaignId) ? { campaignId } : {}),
-      foundryWorldId: session.worldId ?? getSetting(SETTINGS.WORLD_ID) ?? "",
-      foundryWorldName: session.worldName ?? getSetting(SETTINGS.WORLD_NAME) ?? "",
-      localSessionId: session.id ?? recon.sessionId ?? null,
       // User-provided session name → TableCodex session title (server uses this
-      // in place of the auto "<World> – <date>" title when present).
+      // in place of the auto "<World> – <date>" title when present). Read from
+      // the payload root, not from session{}.
       title: session.title ?? null,
-      startedAt: recon.startedAt ?? session.startedAt ?? null,
-      endedAt: recon.endedAt ?? null,
-      foundryVersion: session.foundryVersion ?? game.version ?? null,
-      systemId: session.systemId ?? game.system?.id ?? null,
-      moduleVersion: session.moduleVersion ?? MODULE_VERSION,
-      rawEvents: events,
-      rolls,
-      combats: recon.combats ?? [],
-      actors,
+      schemaVersion: String(ENVELOPE_SCHEMA),
+      ...(payload?.module ? { module: payload.module } : {}),
+      session: {
+        ...session,
+        id: session.id ?? recon.sessionId ?? null,
+        worldId,
+        worldName,
+        // startedAt/endedAt may be epoch ms (session meta) or ISO (reconstruction);
+        // the server normalizes both. Fall back to the reconstruction bounds so a
+        // mid-session "Sync now" still reports an end time.
+        startedAt: session.startedAt ?? recon.startedAt ?? null,
+        endedAt: session.endedAt ?? recon.endedAt ?? null,
+        systemId: session.systemId || game?.system?.id || null,
+        foundryVersion: session.foundryVersion || game?.version || null,
+        moduleVersion: session.moduleVersion || MODULE_VERSION,
+      },
+      reconstruction: recon,
+      rawEvents: payload?.rawEvents ?? [],
     };
   }
 

@@ -265,5 +265,49 @@ console.log("\n[10] Session recency signal survives resume()");
   await sessionManager.stop();
 }
 
+console.log("\n[11] Sync body keeps the capture envelope shape");
+{
+  // The server sniffs the payload shape and only routes to its "module capture
+  // format" branch when the body carries session/reconstruction AND does NOT
+  // carry foundryWorldId, rolls, or chatMessages. That branch is what reads the
+  // session recency ordinal, re-injects actor ids, and avoids importing rolls
+  // twice. Detection tests key PRESENCE, so these keys must be absent entirely.
+  settingsStore.delete("sessionIndex");
+  resetSeq(0);
+  const { ApiClient } = await import("../scripts/export/api-client.js");
+  const client = new ApiClient();
+
+  const started = await sessionManager.start({ title: "Sync shape session" });
+  eventBus.emit(buildEvent(EVENT_TYPES.ROLL, {
+    actorId: "a1",
+    metadata: { formula: "1d20", total: 17, speakerAlias: "Ryn" },
+  }));
+  await eventStore.forceFlush();
+
+  const body = client._buildImportPayload(buildPayload());
+
+  ok(!("foundryWorldId" in body), "sync body omits foundryWorldId (would force the legacy branch)");
+  ok(!("rolls" in body), "sync body omits rolls (would double-import every roll)");
+  ok(!("chatMessages" in body), "sync body omits chatMessages (would force the legacy branch)");
+
+  ok(!!body.session, "sync body carries the session block");
+  ok(!!body.reconstruction, "sync body carries the reconstruction block");
+  ok(body.session.sessionIndex === started.sessionIndex, "sync body carries sessionIndex");
+  ok(body.session.previousSessionId === started.previousSessionId, "sync body carries previousSessionId");
+  ok(body.session.worldId === "test-world", "sync body resolves a non-empty worldId");
+  ok(body.session.worldName === "Test World", "sync body resolves a non-empty worldName");
+  ok(body.title === "Sync shape session", "sync body keeps title at the root");
+  ok(typeof body.schemaVersion === "string", "schemaVersion is a string (server schema rejects numbers)");
+  ok(body.rawEvents.length > 0, "sync body carries the raw event log");
+
+  // The server converts reconstruction.actors (a dict) to an array itself.
+  ok(
+    body.reconstruction.actors && !Array.isArray(body.reconstruction.actors),
+    "reconstruction.actors is passed through as a dict, not pre-flattened",
+  );
+
+  await sessionManager.stop();
+}
+
 console.log(`\n${failed === 0 ? "PASS" : "FAIL"} — ${passed} passed, ${failed} failed\n`);
 process.exit(failed === 0 ? 0 : 1);
