@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.4 — Sync sends the capture envelope
+
+The recency signal added in 1.0.3 never actually reached TableCodex over the API. This makes the sync path carry it.
+
+- **`sessionIndex` / `previousSessionId` now survive an API sync.** `api-client._buildImportPayload()` was flattening the export envelope into top-level scalars and derived arrays, which dropped the `session` block — the only place the server reads the recency ordinal from. Every synced session therefore arrived with a null ordinal, and the recap/intelligence pipelines fell back to guessing order from timestamps and upload order. The module had been computing the ordinal correctly since 1.0.3, and a manually uploaded export JSON preserved it, so the two ingest paths disagreed about the same session. Sync now sends the envelope as-is (`session` + `reconstruction` + `rawEvents` + `module`), which is also the shape the server has a dedicated import path for.
+- **Rolls are no longer imported twice.** The flattened payload included a `rolls` array derived from the same events already present in `rawEvents`, and nothing on either side deduplicated the two — so every captured roll produced two rows. The duplicate was the worse of the pair: it had no actor, because the server reads `roll.actor` while `roll-capture` records the speaker as `metadata.speakerAlias`. Measured against a real captured session, this cut parsed events from 14 to 11 and roll events from 6 (3 unattributed) to 3, all attributed.
+- **`systemId` / `foundryVersion` / `moduleVersion` now reach the import record**, resolved from the `session` block. The old flattened shape routed to a legacy server path that did not surface them at all.
+- **Package version realigned.** `package.json` had drifted to 1.0.2 while `module.json` and `MODULE_VERSION` were at 1.0.3; all three now move together.
+
 ## 1.0.3 — Explicit session recency signal
 
 - **`sessionIndex` and `previousSessionId` added to the session export contract.** `session-manager.start()` now reads the world's `SETTINGS.SESSION_INDEX` and stamps the new session with its 0-based ordinal position (`sessionIndex`) and the id of the last finished session (`previousSessionId`, `null` for the world's first session). Both fields flow through `SESSION_START` metadata into `SessionMeta`, survive `resume()` (rebuilt from the persisted `SESSION_START` event), and are carried in the export payload's `session` block. Downstream consumers can now determine session order deterministically instead of inferring it from timestamps or upload order.

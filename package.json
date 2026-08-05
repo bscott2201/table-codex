@@ -1,6 +1,6 @@
 {
   "name": "tablecodex-sync",
-  "version": "1.0.2",
+  "version": "1.0.4",
   "private": true,
   "type": "module",
   "description": "Foundry VTT V14 session telemetry capture & reconstruction module (no build step; package.json present only for tooling/Node test harness \u2014 Foundry loads scripts directly as ESM).",
